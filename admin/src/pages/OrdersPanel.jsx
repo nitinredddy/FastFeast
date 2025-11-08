@@ -72,7 +72,9 @@ const OrdersPanel = () => {
         <div className="p-8">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-semibold">
-              {statusFilter === "completed" ? "Completed Orders ✅" : "Active Orders 🕒"}
+              {statusFilter === "completed"
+                ? "Completed Orders ✅"
+                : "Active Orders 🕒"}
             </h2>
 
             {/* 📅 Date Picker */}
@@ -120,7 +122,7 @@ const OrdersPanel = () => {
             </div>
           ) : filteredOrders.length === 0 ? (
             <div className="text-center text-gray-500 py-10">
-              No active orders found 🍽️
+              No {statusFilter} orders found 🍽️
             </div>
           ) : (
             <div className="bg-white rounded-xl shadow overflow-x-auto">
@@ -136,7 +138,10 @@ const OrdersPanel = () => {
                 </thead>
                 <tbody>
                   {filteredOrders.map((order) => (
-                    <tr key={order.order_id} className="border-b hover:bg-gray-50">
+                    <tr
+                      key={order.order_id}
+                      className="border-b hover:bg-gray-50 transition"
+                    >
                       <td className="p-3 font-semibold text-orange-600">
                         #{order.order_no}
                       </td>
@@ -151,6 +156,8 @@ const OrdersPanel = () => {
                           {order.status}
                         </span>
                       </td>
+
+                      {/* ✅ Disable status change for completed orders */}
                       <td className="p-3 text-center flex justify-center gap-2">
                         <button
                           onClick={() => setSelectedOrder(order)}
@@ -158,21 +165,24 @@ const OrdersPanel = () => {
                         >
                           <Eye size={16} /> View
                         </button>
-                        <select
-                          value={order.status}
-                          onChange={(e) =>
-                            updateStatus(order.order_id, e.target.value)
-                          }
-                          className="border rounded px-2 py-1 text-sm"
-                        >
-                          {["pending", "preparing", "ready", "completed"].map(
-                            (s) => (
-                              <option key={s} value={s}>
-                                {s}
-                              </option>
-                            )
-                          )}
-                        </select>
+
+                        {order.status !== "completed" && (
+                          <select
+                            value={order.status}
+                            onChange={(e) =>
+                              updateStatus(order.order_id, e.target.value)
+                            }
+                            className="border rounded px-2 py-1 text-sm"
+                          >
+                            {["pending", "completed"].map(
+                              (s) => (
+                                <option key={s} value={s}>
+                                  {s}
+                                </option>
+                              )
+                            )}
+                          </select>
+                        )}
                       </td>
                     </tr>
                   ))}
