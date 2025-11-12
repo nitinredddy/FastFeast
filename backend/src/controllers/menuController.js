@@ -32,11 +32,11 @@ export const getMenu = async (req, res) => {
 // ➕ Add a new menu item (admin only)
 export const addMenuItem = async (req, res) => {
   try {
-    const { name, price, category, availability = true } = req.body;
+    const { name, cost, category, availability = true } = req.body;
 
     const [result] = await pool.query(
-      "INSERT INTO Menu (name, price, category, availability) VALUES (?, ?, ?, ?)",
-      [name, price, category, availability]
+      "INSERT INTO Menu (name, cost, category, availability) VALUES (?, ?, ?, ?)",
+      [name, cost, category, availability]
     );
 
     res.status(201).json({ message: "Item added successfully", id: result.insertId });
@@ -50,11 +50,11 @@ export const addMenuItem = async (req, res) => {
 export const updateMenuItem = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, price, category, availability } = req.body;
+    const { name, cost, category, availability } = req.body;
 
     await pool.query(
-      "UPDATE Menu SET name = ?, price = ?, category = ?, availability = ? WHERE item_id = ?",
-      [name, price, category, availability, id]
+      "UPDATE Menu SET name = ?, cost = ?, category = ?, availability = ? WHERE item_id = ?",
+      [name, cost, category, availability, id]
     );
 
     res.json({ message: "Menu item updated successfully" });

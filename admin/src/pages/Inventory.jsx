@@ -77,7 +77,7 @@ const Inventory = () => {
                         {it.name}
                       </td>
                       <td className="p-3 text-gray-600">{it.category}</td>
-                      <td className="p-3 text-gray-700">{it.price}</td>
+                      <td className="p-3 text-gray-700">{it.cost}</td>
                       <td className="p-3 text-center">
                         <button
                           onClick={() =>

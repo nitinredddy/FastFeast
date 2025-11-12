@@ -6,7 +6,7 @@ import { Pencil, Trash2, ToggleLeft, ToggleRight } from "lucide-react";
 
 const MenuManager = () => {
   const [menu, setMenu] = useState([]);
-  const [form, setForm] = useState({ name: "", price: "", category: "" });
+  const [form, setForm] = useState({ name: "", cost: "", category: "" });
   const [editId, setEditId] = useState(null);
 
   useEffect(() => {
@@ -20,7 +20,7 @@ const MenuManager = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.name || !form.price) return;
+    if (!form.name || !form.cost) return;
 
     if (editId) {
       await axios.put(`/menu/${editId}`, form);
@@ -28,7 +28,7 @@ const MenuManager = () => {
       await axios.post("/menu", form);
     }
 
-    setForm({ name: "", price: "", category: "" });
+    setForm({ name: "", cost: "", category: "" });
     setEditId(null);
     fetchMenu();
   };
@@ -64,8 +64,8 @@ const MenuManager = () => {
             <input
               type="number"
               placeholder="Price"
-              value={form.price}
-              onChange={(e) => setForm({ ...form, price: e.target.value })}
+              value={form.cost}
+              onChange={(e) => setForm({ ...form, cost: e.target.value })}
               className="border rounded-lg p-2 w-32"
               required
             />
@@ -104,7 +104,7 @@ const MenuManager = () => {
                 <tr key={item.item_id} className="border-b">
                   <td className="p-3">{item.name}</td>
                   <td className="p-3">{item.category}</td>
-                  <td className="p-3">₹{item.price}</td>
+                  <td className="p-3">₹{item.cost}</td>
                   <td className="text-center">
                     <button
                       onClick={() => toggleAvailability(item.item_id, item.availability)}

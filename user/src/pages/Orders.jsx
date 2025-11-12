@@ -47,6 +47,8 @@ const Orders = () => {
         return "bg-green-100 text-green-700";
       case "completed":
         return "bg-gray-100 text-gray-600";
+      case "cancelled":
+        return "bg-red-100 text-red-600";
       default:
         return "bg-gray-50 text-gray-500";
     }
@@ -60,8 +62,26 @@ const Orders = () => {
         return "Your order is ready for pickup 🥡";
       case "completed":
         return "Enjoy your meal 😋";
+      case "cancelled":
+        return "You cancelled this order ❌";
       default:
         return "Order status unknown";
+    }
+  };
+
+  // 🚫 Cancel Order
+  const handleCancel = async (orderId) => {
+    if (!window.confirm("Are you sure you want to cancel this order?")) return;
+
+    try {
+      const res = await axios.put(`/orders/cancel/${orderId}`);
+      toast.success(res.data.message);
+      fetchOrders(); // Refresh orders list
+    } catch (err) {
+      console.error("Cancel order error:", err);
+      toast.error(
+        err.response?.data?.message || "Failed to cancel order. Please try again."
+      );
     }
   };
 
@@ -136,8 +156,18 @@ const Orders = () => {
                   {getStatusMessage(order.status)}
                 </div>
 
+                {/* Cancel Order Button */}
+                {(order.status === "pending" || order.status === "preparing") && (
+                  <button
+                    onClick={() => handleCancel(order.order_id)}
+                    className="w-full mt-3 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white font-medium transition"
+                  >
+                    Cancel Order
+                  </button>
+                )}
+
                 {/* Footer */}
-                <div className="flex justify-between items-center text-sm text-gray-500">
+                <div className="flex justify-between items-center text-sm text-gray-500 mt-4">
                   <span className="flex items-center gap-1">
                     <Clock size={14} />
                     {new Date(order.order_date).toLocaleString()}
@@ -151,6 +181,8 @@ const Orders = () => {
                     <span className="text-green-600 font-semibold">
                       Ready for Pickup
                     </span>
+                  ) : order.status === "cancelled" ? (
+                    <span className="text-red-500 font-medium">Cancelled</span>
                   ) : (
                     <span className="text-orange-500 font-medium">
                       Preparing

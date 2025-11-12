@@ -22,7 +22,7 @@ const Cart = () => {
   }, [cart]);
 
   const calculateTotal = () => {
-    const t = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const t = cart.reduce((sum, item) => sum + item.cost * item.quantity, 0);
     setTotal(t);
   };
 

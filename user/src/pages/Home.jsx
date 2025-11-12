@@ -143,7 +143,7 @@ const Home = () => {
               >
                 <h3 className="text-lg font-semibold text-gray-800">{item.name}</h3>
                 <p className="text-gray-500 text-sm mb-2">{item.category}</p>
-                <p className="text-orange-600 font-semibold text-lg">₹{item.price}</p>
+                <p className="text-orange-600 font-semibold text-lg">₹{item.cost}</p>
 
                 <div className="flex justify-between items-center mt-4">
                   <span

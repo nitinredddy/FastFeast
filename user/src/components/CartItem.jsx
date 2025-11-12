@@ -8,7 +8,7 @@ const CartItem = ({ item, onIncrease, onDecrease, onRemove }) => {
       <div>
         <h3 className="text-lg font-semibold text-gray-800">{item.name}</h3>
         <p className="text-gray-500 text-sm">{item.category}</p>
-        <p className="text-orange-600 font-semibold mt-1">₹{item.price}</p>
+        <p className="text-orange-600 font-semibold mt-1">₹{item.cost}</p>
       </div>
 
       <div className="flex items-center gap-3">

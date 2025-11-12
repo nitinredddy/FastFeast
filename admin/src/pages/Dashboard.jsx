@@ -25,8 +25,10 @@ const Dashboard = () => {
   // 🔸 Fetch recent orders (show 5 latest)
   const fetchRecentOrders = async () => {
     try {
-      const res = await axios.get("/admin-routes"); // admin route (GET /orders)
-      setRecentOrders(res.data.slice(0, 5));
+      const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+      const res = await axios.get(`/admin-routes?date=${today}`);
+      setRecentOrders(res.data.orders.slice(0, 5));
+
     } catch (err) {
       console.error("Orders fetch failed:", err);
     }
@@ -95,7 +97,7 @@ const Dashboard = () => {
                     <table className="w-full text-left">
                       <thead className="bg-orange-100 text-gray-700 text-sm">
                         <tr>
-                          <th className="p-3">Order ID</th>
+                          <th className="p-3">Order No</th>
                           <th className="p-3">Customer</th>
                           <th className="p-3">Amount</th>
                           <th className="p-3">Status</th>
@@ -106,11 +108,11 @@ const Dashboard = () => {
                       <tbody className="text-sm">
                         {recentOrders.map((order) => (
                           <tr
-                            key={order.order_id}
+                            key={order.order_no}
                             className="border-b hover:bg-orange-50 transition"
                           >
                             <td className="p-3 font-medium text-gray-800">
-                              #{order.order_id}
+                              #{order.order_no}
                             </td>
                             <td className="p-3">{order.customer_name}</td>
                             <td className="p-3">₹{order.amount}</td>

@@ -3,56 +3,33 @@ import pool from "../config/db.js";
 
 /* ============================
    🧾 Create a New Order (User)
+   Uses: create_order_with_items()
 =============================== */
 export const createOrder = async (req, res) => {
   try {
     const { items, payment_mode = "UPI", pickup_time = null } = req.body;
+    const user_id = req.user.user_id;
+
     if (!items || items.length === 0)
       return res.status(400).json({ message: "Items required" });
 
-    // ✅ Fetch item prices for validation
-    const ids = items.map((i) => i.item_id);
-    const [menuItems] = await pool.query(
-      `SELECT item_id, price FROM Menu WHERE item_id IN (${ids.map(() => "?").join(",")})`,
-      ids
+    // Convert items array to JSON string for SQL procedure
+    const itemsJson = JSON.stringify(items);
+
+    // ⚡ Call stored procedure to handle everything atomically
+    const [resultSets] = await pool.query(
+      "CALL create_order_with_items(?, ?, ?, ?)",
+      [user_id, payment_mode, pickup_time, itemsJson]
     );
 
-    const priceMap = {};
-    menuItems.forEach((m) => (priceMap[m.item_id] = m.price));
-
-    let total = 0;
-    items.forEach((it) => (total += priceMap[it.item_id] * it.quantity));
-
-    // 🕒 Get today's order count for order_no
-    const today = new Date().toISOString().split("T")[0];
-    const [existing] = await pool.query(
-      `SELECT COUNT(*) AS count FROM Orders WHERE DATE(order_date) = ?`,
-      [today]
-    );
-    const order_no = existing[0].count + 1;
-
-    // ⚠️ FIXED: Correct number of placeholders (6 values → 6 ?)
-    const [orderRes] = await pool.query(
-      `INSERT INTO Orders (user_id, amount, payment_mode, pickup_time, order_no, status) 
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [req.user.user_id, total, payment_mode, pickup_time, order_no, "preparing"]
-    );
-
-    const order_id = orderRes.insertId;
-
-    // ✅ Insert order items
-    for (const it of items) {
-      await pool.query(
-        `INSERT INTO OrderItem (order_id, item_id, quantity) VALUES (?, ?, ?)`,
-        [order_id, it.item_id, it.quantity]
-      );
-    }
+    // The first result set contains the returned order info
+    const orderInfo = resultSets[0]?.[0];
 
     res.status(201).json({
-      message: "Order placed successfully",
-      order_id,
-      order_no,
-      amount: total,
+      message: "Order placed successfully ✅",
+      order_id: orderInfo?.order_id,
+      order_no: orderInfo?.order_no,
+      amount: orderInfo?.amount,
     });
   } catch (err) {
     console.error("❌ Error creating order:", err);
@@ -70,7 +47,7 @@ export const getOrderById = async (req, res) => {
       [req.params.id]
     );
     const [items] = await pool.query(
-      `SELECT m.name, oi.quantity, m.price 
+      `SELECT m.name, oi.quantity, m.cost 
        FROM OrderItem oi 
        JOIN Menu m ON oi.item_id = m.item_id 
        WHERE oi.order_id = ?`,
@@ -85,56 +62,23 @@ export const getOrderById = async (req, res) => {
 
 /* ============================
    🧍‍♂️ Get All Orders for Admin
+   Uses: get_orders_by_date()
 =============================== */
 export const getAllOrders = async (req, res) => {
   try {
     // 🗓️ Filter by date or default to today
-    const today = new Date().toISOString().split("T")[0];
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+
     const date = req.query.date || today;
 
-    // ✅ Orders sorted by order_no (FIFO)
-    const [orders] = await pool.query(
-      `SELECT 
-          o.order_id, 
-          o.order_no, 
-          o.user_id, 
-          u.name AS customer_name, 
-          o.amount, 
-          o.status, 
-          o.payment_mode, 
-          o.order_date
-       FROM Orders o
-       JOIN User u ON o.user_id = u.user_id
-       WHERE DATE(o.order_date) = ?
-       ORDER BY o.order_no ASC`,
-      [date]
-    );
+    // ⚡ Call the stored procedure
+    const [resultSets] = await pool.query("CALL get_orders_by_date(?)", [date]);
 
-    // 🧾 Attach item details for each order
-    for (const order of orders) {
-      const [items] = await pool.query(
-        `SELECT m.name, oi.quantity, m.price 
-         FROM OrderItem oi
-         JOIN Menu m ON oi.item_id = m.item_id
-         WHERE oi.order_id = ?`,
-        [order.order_id]
-      );
-      order.items = items;
-    }
+    // Result set 0 = orders, Result set 1 = totalRevenue
+    const orders = resultSets[0];
+    const totalRevenue = resultSets[1]?.[0]?.totalRevenue || 0;
 
-    // 💰 Calculate daily revenue (for completed)
-    const [revenueResult] = await pool.query(
-      `SELECT COALESCE(SUM(amount), 0) AS totalRevenue 
-       FROM Orders 
-       WHERE DATE(order_date) = ? AND status = 'completed'`,
-      [date]
-    );
-
-    res.json({
-      date,
-      totalRevenue: revenueResult[0].totalRevenue || 0,
-      orders,
-    });
+    res.json({ date, totalRevenue, orders });
   } catch (err) {
     console.error("❌ Error fetching all orders:", err);
     res.status(500).json({ message: "Failed to fetch orders" });
@@ -143,17 +87,17 @@ export const getAllOrders = async (req, res) => {
 
 /* ============================
    🔄 Update Order Status (Admin)
+   Uses: update_order_status()
 =============================== */
 export const updateOrderStatus = async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
 
-    await pool.query("UPDATE Orders SET status = ? WHERE order_id = ?", [
-      status,
-      id,
-    ]);
-    res.json({ message: "Order status updated successfully" });
+    // ⚡ Use stored procedure to ensure valid transitions
+    await pool.query("CALL update_order_status(?, ?)", [id, status]);
+
+    res.json({ message: "Order status updated successfully ✅" });
   } catch (err) {
     console.error("❌ Error updating order status:", err);
     res.status(500).json({ message: "Failed to update order status" });
@@ -162,39 +106,39 @@ export const updateOrderStatus = async (req, res) => {
 
 /* ============================
    👤 Get Orders for Logged-In User
+   Uses: get_user_orders()
 =============================== */
 export const getUserOrders = async (req, res) => {
   try {
-    const userId = req.user.user_id;
+    const user_id = req.user.user_id;
 
-    const [rows] = await pool.query(
-      `SELECT 
-          o.order_id,
-          o.order_no,
-          o.amount,
-          o.payment_mode,
-          o.status,
-          o.order_date,
-          JSON_ARRAYAGG(
-              JSON_OBJECT(
-                  'item_id', oi.item_id,
-                  'name', m.name,
-                  'quantity', oi.quantity
-              )
-          ) AS items
-        FROM Orders o
-        JOIN OrderItem oi ON o.order_id = oi.order_id
-        JOIN Menu m ON oi.item_id = m.item_id
-        WHERE o.user_id = ?
-        GROUP BY o.order_id, o.amount, o.payment_mode, o.status, o.order_date, o.order_no
-        ORDER BY o.order_date DESC, o.order_no ASC`,
-      [userId]
-    );
+    // ⚡ Fetch via stored procedure
+    const [resultSets] = await pool.query("CALL get_user_orders(?)", [user_id]);
 
-    // ✅ Return direct array (for frontend)
-    res.status(200).json(rows);
+    const orders = resultSets[0] || [];
+
+    res.status(200).json(orders);
   } catch (err) {
     console.error("❌ Error fetching user orders:", err);
     res.status(500).json([]);
+  }
+};
+
+export const cancelOrder = async (req, res) => {
+  try {
+    const { id } = req.params; // order_id
+
+    await pool.query("CALL cancel_order(?)", [id]);
+
+    res.json({ message: "Order cancelled successfully ✅" });
+  } catch (err) {
+    console.error("❌ Error cancelling order:", err);
+
+    if (err.code === "45000") {
+      // Custom SQL SIGNAL error
+      return res.status(400).json({ message: err.sqlMessage });
+    }
+
+    res.status(500).json({ message: "Failed to cancel order" });
   }
 };
