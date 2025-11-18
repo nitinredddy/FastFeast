@@ -44,7 +44,7 @@ const Dashboard = () => {
     initFetch();
 
     // 🔁 Auto-refresh every 30 seconds
-    const interval = setInterval(initFetch, 30000);
+    const interval = setInterval(initFetch, 10000);
     return () => clearInterval(interval);
   }, []);
 
