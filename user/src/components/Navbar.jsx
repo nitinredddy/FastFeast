@@ -1,17 +1,23 @@
-// src/components/Navbar.jsx
-import React from "react";
-import { useNavigate } from "react-router-dom";
-import { ShoppingCart, LogOut } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { LogOut, Menu, MessageSquareText, ShoppingCart, X } from "lucide-react";
 import axios from "../api/axios";
 import toast from "react-hot-toast";
 
 const Navbar = ({ cartCount = 0 }) => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  useEffect(() => {
+    setIsMenuOpen(false);
+  }, [location.pathname]);
 
   const handleLogout = async () => {
     try {
-      await axios.post("/auth/logout", {}, { withCredentials: true });
-      toast.success("Logged out successfully 👋");
+      await axios.post("/auth/logout");
+      localStorage.removeItem("fastfeast-cart");
+      toast.success("Logged out successfully");
       navigate("/login");
     } catch (err) {
       console.error("Logout error:", err);
@@ -19,55 +25,120 @@ const Navbar = ({ cartCount = 0 }) => {
     }
   };
 
+  const navItems = [
+    { label: "Menu", path: "/home" },
+    { label: "My Orders", path: "/orders" },
+    { label: "Feedback", path: "/feedback" },
+  ];
+
   return (
-    <nav className="flex justify-between items-center bg-white shadow-md px-8 py-4">
-      {/* 🍽️ Brand */}
-      <h1
-        className="text-2xl font-bold text-orange-600 cursor-pointer"
-        onClick={() => navigate("/")}
-      >
-        FastFeast
-      </h1>
-
-      {/* 🧭 Navigation */}
-      <div className="flex items-center gap-6">
-        <button
-          onClick={() => navigate("/orders")}
-          className="text-gray-700 hover:text-orange-500 transition font-medium"
-        >
-          My Orders
+    <header className="sticky top-0 z-40 border-b border-orange-100 bg-white/90 backdrop-blur">
+      <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
+        <button className="text-left" onClick={() => navigate("/home")}>
+          <p className="text-xs font-semibold uppercase tracking-[0.35em] text-orange-500">
+            FastFeast
+          </p>
+          <h1 className="text-lg font-bold text-slate-900">Preorder and pickup</h1>
         </button>
 
-        <button
-          onClick={() => navigate("/feedback")}
-          className="text-gray-700 hover:text-orange-500 transition font-medium"
-        >
-          Feedback
-        </button>
+        <div className="hidden items-center gap-3 md:flex">
+          {navItems.map((item) => {
+            const active = location.pathname === item.path;
+            return (
+              <button
+                key={item.path}
+                onClick={() => navigate(item.path)}
+                className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                  active
+                    ? "bg-orange-500 text-white shadow-sm"
+                    : "text-slate-600 hover:bg-orange-50 hover:text-orange-600"
+                }`}
+              >
+                {item.label}
+              </button>
+            );
+          })}
 
-        {/* 🛒 Cart */}
-        <button
-          onClick={() => navigate("/cart")}
-          className="relative flex items-center text-gray-700 hover:text-orange-500 transition"
-        >
-          <ShoppingCart size={22} />
-          {cartCount > 0 && (
-            <span className="absolute -top-2 -right-3 bg-orange-500 text-white text-xs font-semibold px-2 py-0.5 rounded-full">
-              {cartCount}
-            </span>
-          )}
-        </button>
+          <button
+            onClick={() => navigate("/cart")}
+            className="relative flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-orange-200 hover:text-orange-600"
+          >
+            <ShoppingCart size={18} />
+            Cart
+            {cartCount > 0 && (
+              <span className="rounded-full bg-orange-500 px-2 py-0.5 text-xs font-semibold text-white">
+                {cartCount}
+              </span>
+            )}
+          </button>
 
-        {/* 🚪 Logout */}
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
+          >
+            <LogOut size={16} />
+            Logout
+          </button>
+        </div>
+
         <button
-          onClick={handleLogout}
-          className="flex items-center gap-1 text-red-600 hover:text-red-700 font-medium transition"
+          onClick={() => setIsMenuOpen((current) => !current)}
+          className="rounded-full border border-slate-200 p-2 text-slate-700 md:hidden"
+          aria-label="Toggle navigation"
         >
-          <LogOut size={18} />
-          Logout
+          {isMenuOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
       </div>
-    </nav>
+
+      {isMenuOpen && (
+        <div className="border-t border-orange-100 bg-white px-4 py-4 md:hidden">
+          <div className="mx-auto flex max-w-6xl flex-col gap-2">
+            {navItems.map((item) => (
+              <button
+                key={item.path}
+                onClick={() => navigate(item.path)}
+                className={`rounded-2xl px-4 py-3 text-left text-sm font-medium transition ${
+                  location.pathname === item.path
+                    ? "bg-orange-500 text-white"
+                    : "bg-orange-50 text-slate-700"
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+
+            <button
+              onClick={() => navigate("/cart")}
+              className="flex items-center justify-between rounded-2xl bg-slate-100 px-4 py-3 text-sm font-medium text-slate-700"
+            >
+              <span className="flex items-center gap-2">
+                <ShoppingCart size={16} />
+                Cart
+              </span>
+              <span className="rounded-full bg-orange-500 px-2 py-0.5 text-xs font-semibold text-white">
+                {cartCount}
+              </span>
+            </button>
+
+            <button
+              onClick={() => navigate("/feedback")}
+              className="flex items-center gap-2 rounded-2xl bg-slate-100 px-4 py-3 text-sm font-medium text-slate-700"
+            >
+              <MessageSquareText size={16} />
+              Share feedback
+            </button>
+
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white"
+            >
+              <LogOut size={16} />
+              Logout
+            </button>
+          </div>
+        </div>
+      )}
+    </header>
   );
 };
 

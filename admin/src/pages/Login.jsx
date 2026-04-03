@@ -36,6 +36,9 @@ const Login = () => {
         <h2 className="text-2xl font-bold text-center text-orange-600 mb-4">
           Admin Login 🍽️
         </h2>
+        <p className="mb-4 text-center text-sm text-gray-500">
+          For admin and staff accounts only.
+        </p>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <input
             type="email"

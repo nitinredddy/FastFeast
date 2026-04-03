@@ -1,147 +1,269 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
+import { Pencil, ToggleLeft, ToggleRight, Trash2 } from "lucide-react";
 import axios from "../api/axios";
-import Sidebar from "../components/Sidebar";
 import Navbar from "../components/Navbar";
-import { Pencil, Trash2, ToggleLeft, ToggleRight } from "lucide-react";
+import Sidebar from "../components/Sidebar";
+
+const emptyForm = { name: "", cost: "", category: "", stock_quantity: 0 };
 
 const MenuManager = () => {
   const [menu, setMenu] = useState([]);
-  const [form, setForm] = useState({ name: "", cost: "", category: "" });
+  const [form, setForm] = useState(emptyForm);
   const [editId, setEditId] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchMenu();
   }, []);
 
   const fetchMenu = async () => {
-    const res = await axios.get("/menu");
-    setMenu(res.data);
+    try {
+      setLoading(true);
+      const res = await axios.get("/menu");
+      setMenu(res.data || []);
+    } catch (err) {
+      console.error("Menu fetch error:", err);
+      alert("Failed to fetch menu");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!form.name || !form.cost) return;
+  const handleSubmit = async (event) => {
+    event.preventDefault();
 
-    if (editId) {
-      await axios.put(`/menu/${editId}`, form);
-    } else {
-      await axios.post("/menu", form);
+    try {
+      if (editId) {
+        await axios.put(`/menu/${editId}`, form);
+      } else {
+        await axios.post("/menu", {
+          ...form,
+          stock_quantity: Number(form.stock_quantity),
+        });
+      }
+
+      setForm(emptyForm);
+      setEditId(null);
+      fetchMenu();
+    } catch (err) {
+      console.error("Menu save error:", err);
+      alert(err.response?.data?.message || "Failed to save menu item");
     }
-
-    setForm({ name: "", cost: "", category: "" });
-    setEditId(null);
-    fetchMenu();
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm("Delete this item?")) {
+    if (!window.confirm("Delete this item?")) return;
+
+    try {
       await axios.delete(`/menu/${id}`);
       fetchMenu();
+    } catch (err) {
+      console.error("Menu delete error:", err);
+      alert(err.response?.data?.message || "Failed to delete item");
     }
   };
 
   const toggleAvailability = async (id, current) => {
-    await axios.patch(`/menu/${id}/availability`, { availability: !current });
-    fetchMenu();
+    try {
+      await axios.patch(`/menu/${id}/availability`, { availability: !current });
+      fetchMenu();
+    } catch (err) {
+      console.error("Availability update error:", err);
+      alert("Failed to update availability");
+    }
   };
 
   return (
-    <div className="flex">
+    <div className="flex min-h-screen bg-slate-100">
       <Sidebar />
+
       <main className="flex-1">
         <Navbar />
-        <div className="p-8">
-          <h2 className="text-2xl font-semibold mb-4 text-gray-800">Manage Menu 🍽️</h2>
-          <form onSubmit={handleSubmit} className="mb-8 flex gap-3">
-            <input
-              type="text"
-              placeholder="Name"
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              className="border rounded-lg p-2 flex-1"
-              required
-            />
-            <input
-              type="number"
-              placeholder="Price"
-              value={form.cost}
-              onChange={(e) => setForm({ ...form, cost: e.target.value })}
-              className="border rounded-lg p-2 w-32"
-              required
-            />
-            <select
-              value={form.category}
-              onChange={(e) => setForm({ ...form, category: e.target.value })}
-              className="border rounded-lg p-2"
-            >
-              <option value="">Select Category</option>
-              <option value="Breakfast">Breakfast</option>
-              <option value="Lunch">Lunch</option>
-              <option value="Snacks">Snacks</option>
-              <option value="Beverages">Beverages</option>
-              <option value="Desserts">Desserts</option>
-            </select>
-            <button
-              type="submit"
-              className="bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition"
-            >
-              {editId ? "Update" : "Add"}
-            </button>
-          </form>
 
-          <table className="w-full bg-white rounded-lg shadow">
-            <thead>
-              <tr className="bg-orange-100">
-                <th className="p-3 text-left">Name</th>
-                <th className="p-3 text-left">Category</th>
-                <th className="p-3 text-left">Price</th>
-                <th className="p-3 text-center">Available</th>
-                <th className="p-3 text-center">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {menu.map((item) => (
-                <tr key={item.item_id} className="border-b">
-                  <td className="p-3">{item.name}</td>
-                  <td className="p-3">{item.category}</td>
-                  <td className="p-3">₹{item.cost}</td>
-                  <td className="text-center">
+        <div className="p-4 sm:p-6 lg:p-8">
+          <section className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+            <div className="rounded-3xl bg-white p-6 shadow-sm">
+              <p className="text-sm font-semibold uppercase tracking-[0.3em] text-orange-500">
+                Menu studio
+              </p>
+              <h2 className="mt-2 text-3xl font-bold text-slate-900">
+                {editId ? "Edit menu item" : "Add a new menu item"}
+              </h2>
+              <p className="mt-2 text-sm text-slate-500">
+                Keep the customer app up to date with accurate categories, pricing, and launch stock.
+              </p>
+
+              <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+                <input
+                  type="text"
+                  placeholder="Item name"
+                  value={form.name}
+                  onChange={(event) => setForm({ ...form, name: event.target.value })}
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-orange-400 focus:bg-white"
+                  required
+                />
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <input
+                    type="number"
+                    min="1"
+                    step="0.01"
+                    placeholder="Price"
+                    value={form.cost}
+                    onChange={(event) => setForm({ ...form, cost: event.target.value })}
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-orange-400 focus:bg-white"
+                    required
+                  />
+
+                  <select
+                    value={form.category}
+                    onChange={(event) => setForm({ ...form, category: event.target.value })}
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-orange-400 focus:bg-white"
+                    required
+                  >
+                    <option value="">Select category</option>
+                    <option value="Breakfast">Breakfast</option>
+                    <option value="Lunch">Lunch</option>
+                    <option value="Snacks">Snacks</option>
+                    <option value="Beverages">Beverages</option>
+                    <option value="Desserts">Desserts</option>
+                  </select>
+                </div>
+
+                {!editId && (
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="Initial stock quantity"
+                    value={form.stock_quantity}
+                    onChange={(event) => setForm({ ...form, stock_quantity: event.target.value })}
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-orange-400 focus:bg-white"
+                  />
+                )}
+
+                <div className="flex gap-3">
+                  <button
+                    type="submit"
+                    className="rounded-2xl bg-orange-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-orange-600"
+                  >
+                    {editId ? "Update item" : "Add item"}
+                  </button>
+
+                  {editId && (
                     <button
-                      onClick={() => toggleAvailability(item.item_id, item.availability)}
-                      className="text-orange-600"
+                      type="button"
+                      onClick={() => {
+                        setEditId(null);
+                        setForm(emptyForm);
+                      }}
+                      className="rounded-2xl bg-slate-100 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-200"
                     >
-                      {item.availability ? <ToggleRight size={20} /> : <ToggleLeft size={20} />}
+                      Cancel
                     </button>
-                  </td>
-                  <td className="text-center space-x-2">
-                    <button
-                      onClick={() => setEditId(item.item_id) || setForm(item)}
-                      className="text-blue-600"
-                    >
-                      <Pencil size={18} />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(item.item_id)}
-                      className="text-red-600"
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {menu.length === 0 && (
-                <tr>
-                  <td colSpan="5" className="p-4 text-center text-gray-500">
-                    No menu items found.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                  )}
+                </div>
+              </form>
+            </div>
+
+            <div className="rounded-3xl bg-slate-950 p-6 text-white shadow-sm">
+              <h3 className="text-2xl font-semibold">Menu health</h3>
+              <div className="mt-6 grid gap-4 sm:grid-cols-3">
+                <SummaryCard value={menu.length} label="Total items" />
+                <SummaryCard
+                  value={menu.filter((item) => item.availability).length}
+                  label="Currently available"
+                />
+                <SummaryCard
+                  value={new Set(menu.map((item) => item.category)).size}
+                  label="Active categories"
+                />
+              </div>
+            </div>
+          </section>
+
+          <section className="mt-6 rounded-3xl bg-white p-6 shadow-sm">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <h3 className="text-2xl font-semibold text-slate-900">Menu list</h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  Toggle item availability instantly or jump into edit mode when details change.
+                </p>
+              </div>
+            </div>
+
+            {loading ? (
+              <div className="flex justify-center py-12">
+                <div className="h-10 w-10 animate-spin rounded-full border-4 border-orange-200 border-t-orange-500" />
+              </div>
+            ) : (
+              <div className="mt-6 overflow-x-auto">
+                <table className="min-w-full text-left text-sm">
+                  <thead className="border-b border-slate-200 text-slate-500">
+                    <tr>
+                      <th className="px-3 py-3 font-medium">Name</th>
+                      <th className="px-3 py-3 font-medium">Category</th>
+                      <th className="px-3 py-3 font-medium">Price</th>
+                      <th className="px-3 py-3 font-medium">Available</th>
+                      <th className="px-3 py-3 font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {menu.map((item) => (
+                      <tr key={item.item_id} className="border-b border-slate-100 text-slate-700">
+                        <td className="px-3 py-4 font-medium text-slate-900">{item.name}</td>
+                        <td className="px-3 py-4">{item.category}</td>
+                        <td className="px-3 py-4">₹{item.cost}</td>
+                        <td className="px-3 py-4">
+                          <button
+                            onClick={() => toggleAvailability(item.item_id, item.availability)}
+                            className="text-orange-600"
+                            aria-label="Toggle availability"
+                          >
+                            {item.availability ? <ToggleRight size={22} /> : <ToggleLeft size={22} />}
+                          </button>
+                        </td>
+                        <td className="px-3 py-4">
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={() => {
+                                setEditId(item.item_id);
+                                setForm({
+                                  name: item.name,
+                                  cost: item.cost,
+                                  category: item.category,
+                                  stock_quantity: 0,
+                                });
+                              }}
+                              className="rounded-full bg-slate-100 p-2 text-blue-600 transition hover:bg-slate-200"
+                            >
+                              <Pencil size={16} />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(item.item_id)}
+                              className="rounded-full bg-slate-100 p-2 text-red-600 transition hover:bg-slate-200"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
         </div>
       </main>
     </div>
   );
 };
+
+const SummaryCard = ({ value, label }) => (
+  <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+    <p className="text-3xl font-bold">{value}</p>
+    <p className="mt-2 text-sm text-slate-300">{label}</p>
+  </div>
+);
 
 export default MenuManager;

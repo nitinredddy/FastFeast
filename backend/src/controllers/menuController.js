@@ -32,11 +32,20 @@ export const getMenu = async (req, res) => {
 // ➕ Add a new menu item (admin only)
 export const addMenuItem = async (req, res) => {
   try {
-    const { name, cost, category, availability = true } = req.body;
+    const { name, cost, category, availability = true, stock_quantity = 0 } = req.body;
+
+    if (!name || !cost || !category) {
+      return res.status(400).json({ message: "Name, price, and category are required" });
+    }
 
     const [result] = await pool.query(
       "INSERT INTO Menu (name, cost, category, availability) VALUES (?, ?, ?, ?)",
       [name, cost, category, availability]
+    );
+
+    await pool.query(
+      "INSERT IGNORE INTO Inventory (item_id, stock_quantity) VALUES (?, ?)",
+      [result.insertId, stock_quantity]
     );
 
     res.status(201).json({ message: "Item added successfully", id: result.insertId });
@@ -51,6 +60,10 @@ export const updateMenuItem = async (req, res) => {
   try {
     const { id } = req.params;
     const { name, cost, category, availability } = req.body;
+
+    if (!name || !cost || !category) {
+      return res.status(400).json({ message: "Name, price, and category are required" });
+    }
 
     await pool.query(
       "UPDATE Menu SET name = ?, cost = ?, category = ?, availability = ? WHERE item_id = ?",
@@ -86,6 +99,7 @@ export const toggleAvailability = async (req, res) => {
 export const deleteMenuItem = async (req, res) => {
   try {
     const { id } = req.params;
+    await pool.query("DELETE FROM Inventory WHERE item_id = ?", [id]);
     await pool.query("DELETE FROM Menu WHERE item_id = ?", [id]);
     res.json({ message: "Item deleted successfully" });
   } catch (err) {

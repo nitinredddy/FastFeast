@@ -1,16 +1,19 @@
-import React, { useEffect, useState } from "react";
-import Sidebar from "../components/Sidebar";
-import Navbar from "../components/Navbar";
+import React, { useEffect, useMemo, useState } from "react";
+import { Calendar, Eye, Loader2 } from "lucide-react";
 import axios from "../api/axios";
-import { Eye, Loader2, Calendar } from "lucide-react";
+import Navbar from "../components/Navbar";
+import Sidebar from "../components/Sidebar";
+
+const STATUS_OPTIONS = ["pending", "preparing", "ready", "completed", "cancelled"];
 
 const OrdersPanel = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [detailsLoading, setDetailsLoading] = useState(false);
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [revenue, setRevenue] = useState(0);
-  const [statusFilter, setStatusFilter] = useState("pending");
+  const [statusFilter, setStatusFilter] = useState("active");
 
   useEffect(() => {
     fetchOrders(date);
@@ -23,7 +26,7 @@ const OrdersPanel = () => {
       setOrders(res.data.orders || []);
       setRevenue(Number(res.data.totalRevenue || 0));
     } catch (err) {
-      console.error("❌ Fetch orders error:", err);
+      console.error("Fetch orders error:", err);
       alert("Failed to fetch orders");
     } finally {
       setLoading(false);
@@ -34,155 +37,160 @@ const OrdersPanel = () => {
     try {
       await axios.patch(`/admin-routes/${id}`, { status: newStatus });
       fetchOrders(date);
+
+      if (selectedOrder?.order?.order_id === id) {
+        handleViewOrder(id);
+      }
     } catch (err) {
-      alert("Failed to update status");
+      console.error("Order status update error:", err);
+      alert(err.response?.data?.message || "Failed to update status");
     }
   };
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case "pending":
-      case "preparing":
-        return "bg-yellow-100 text-yellow-700";
-      case "ready":
-        return "bg-green-100 text-green-700";
-      case "completed":
-        return "bg-gray-100 text-gray-600";
-      default:
-        return "bg-gray-50 text-gray-500";
+  const handleViewOrder = async (orderId) => {
+    try {
+      setDetailsLoading(true);
+      const res = await axios.get(`/admin-routes/${orderId}`);
+      setSelectedOrder(res.data);
+    } catch (err) {
+      console.error("Order details fetch error:", err);
+      alert("Failed to load order details");
+    } finally {
+      setDetailsLoading(false);
     }
   };
 
-  // ✅ Treat "preparing" as "pending" for filtering
-  const filteredOrders =
-    statusFilter === "all"
-      ? orders
-      : statusFilter === "pending"
-      ? orders.filter(
-          (o) => o.status === "pending" || o.status === "preparing"
-        )
-      : orders.filter((o) => o.status === statusFilter);
+  const filteredOrders = useMemo(() => {
+    if (statusFilter === "active") {
+      return orders.filter((order) => ["pending", "preparing", "ready"].includes(order.status));
+    }
+
+    if (statusFilter === "completed") {
+      return orders.filter((order) => order.status === "completed");
+    }
+
+    if (statusFilter === "cancelled") {
+      return orders.filter((order) => order.status === "cancelled");
+    }
+
+    return orders;
+  }, [orders, statusFilter]);
 
   return (
-    <div className="flex">
+    <div className="flex min-h-screen bg-slate-100">
       <Sidebar />
-      <main className="flex-1 bg-gray-50 min-h-screen">
+
+      <main className="flex-1">
         <Navbar />
 
-        <div className="p-8">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-semibold">
-              {statusFilter === "completed"
-                ? "Completed Orders ✅"
-                : "Active Orders 🕒"}
-            </h2>
+        <div className="p-4 sm:p-6 lg:p-8">
+          <section className="rounded-3xl bg-white p-6 shadow-sm">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-[0.3em] text-orange-500">
+                  Order workflow
+                </p>
+                <h2 className="mt-2 text-3xl font-bold text-slate-900">Run today’s order queue</h2>
+                <p className="mt-2 text-sm text-slate-500">
+                  Move orders from pending to pickup-ready while keeping an eye on completed revenue.
+                </p>
+              </div>
 
-            {/* 📅 Date Picker */}
-            <div className="flex items-center gap-2 bg-white p-2 rounded-lg shadow-sm border">
-              <Calendar className="text-orange-500" size={18} />
-              <input
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="outline-none text-gray-700 text-sm"
-              />
+              <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <Calendar className="text-orange-500" size={18} />
+                <input
+                  type="date"
+                  value={date}
+                  onChange={(event) => setDate(event.target.value)}
+                  className="bg-transparent text-sm text-slate-700 outline-none"
+                />
+              </div>
             </div>
-          </div>
+          </section>
 
-          {/* 💰 Revenue Summary */}
-          <div className="bg-gradient-to-r from-orange-100 to-orange-50 border border-orange-200 rounded-xl p-4 mb-6 shadow-sm">
-            <h3 className="text-lg font-semibold text-orange-700">
-              Total Revenue for {date}:
-            </h3>
-            <p className="text-2xl font-bold text-orange-600">
-              ₹{Number(revenue || 0).toFixed(2)}
-            </p>
-          </div>
+          <section className="mt-6 grid gap-4 lg:grid-cols-[1fr_auto]">
+            <div className="rounded-3xl bg-slate-950 p-5 text-white shadow-sm">
+              <p className="text-xs uppercase tracking-[0.3em] text-orange-300">Completed revenue</p>
+              <p className="mt-2 text-3xl font-bold">₹{revenue.toFixed(2)}</p>
+            </div>
 
-          {/* 🧾 Status Filter (Pending includes Preparing) */}
-          <div className="flex gap-3 mb-4">
-            {["pending", "completed"].map((s) => (
-              <button
-                key={s}
-                onClick={() => setStatusFilter(s)}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                  statusFilter === s
-                    ? "bg-orange-500 text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-orange-100"
-                }`}
-              >
-                {s === "pending" ? "Pending" : "Completed"}
-              </button>
-            ))}
-          </div>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { key: "active", label: "Active" },
+                { key: "completed", label: "Completed" },
+                { key: "cancelled", label: "Cancelled" },
+                { key: "all", label: "All" },
+              ].map((item) => (
+                <button
+                  key={item.key}
+                  onClick={() => setStatusFilter(item.key)}
+                  className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                    statusFilter === item.key
+                      ? "bg-orange-500 text-white"
+                      : "bg-white text-slate-600 shadow-sm hover:bg-orange-50 hover:text-orange-600"
+                  }`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </section>
 
           {loading ? (
-            <div className="flex justify-center py-10">
+            <div className="flex justify-center py-12">
               <Loader2 className="animate-spin text-orange-500" size={32} />
             </div>
           ) : filteredOrders.length === 0 ? (
-            <div className="text-center text-gray-500 py-10">
-              No {statusFilter} orders found 🍽️
+            <div className="mt-6 rounded-3xl border border-dashed border-slate-200 bg-white p-10 text-center text-sm text-slate-500 shadow-sm">
+              No matching orders found for this date.
             </div>
           ) : (
-            <div className="bg-white rounded-xl shadow overflow-x-auto">
-              <table className="w-full text-left">
-                <thead className="bg-orange-100">
+            <div className="mt-6 overflow-x-auto rounded-3xl bg-white shadow-sm">
+              <table className="min-w-full text-left text-sm">
+                <thead className="border-b border-slate-200 bg-slate-50 text-slate-500">
                   <tr>
-                    <th className="p-3">Order No</th>
-                    <th className="p-3">Customer</th>
-                    <th className="p-3">Amount</th>
-                    <th className="p-3">Status</th>
-                    <th className="p-3 text-center">Action</th>
+                    <th className="px-4 py-3 font-medium">Order</th>
+                    <th className="px-4 py-3 font-medium">Customer</th>
+                    <th className="px-4 py-3 font-medium">Amount</th>
+                    <th className="px-4 py-3 font-medium">Status</th>
+                    <th className="px-4 py-3 font-medium">Payment</th>
+                    <th className="px-4 py-3 font-medium">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredOrders.map((order) => (
-                    <tr
-                      key={order.order_id}
-                      className="border-b hover:bg-gray-50 transition"
-                    >
-                      <td className="p-3 font-semibold text-orange-600">
-                        #{order.order_no}
-                      </td>
-                      <td className="p-3">{order.customer_name}</td>
-                      <td className="p-3">₹{order.amount}</td>
-                      <td className="p-3">
-                        <span
-                          className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(
-                            order.status
-                          )}`}
-                        >
+                    <tr key={order.order_id} className="border-b border-slate-100 text-slate-700">
+                      <td className="px-4 py-4 font-semibold text-orange-600">#{order.order_no}</td>
+                      <td className="px-4 py-4">{order.customer_name}</td>
+                      <td className="px-4 py-4">₹{order.amount}</td>
+                      <td className="px-4 py-4">
+                        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${getStatusColor(order.status)}`}>
                           {order.status}
                         </span>
                       </td>
+                      <td className="px-4 py-4">{order.payment_mode}</td>
+                      <td className="px-4 py-4">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            onClick={() => handleViewOrder(order.order_id)}
+                            className="flex items-center gap-1 rounded-full bg-slate-100 px-3 py-2 font-medium text-slate-700 transition hover:bg-slate-200"
+                          >
+                            <Eye size={15} />
+                            View
+                          </button>
 
-                      {/* ✅ Disable status change for completed orders */}
-                      <td className="p-3 text-center flex justify-center gap-2">
-                        <button
-                          onClick={() => setSelectedOrder(order)}
-                          className="bg-blue-100 text-blue-700 px-3 py-1 rounded flex items-center gap-1"
-                        >
-                          <Eye size={16} /> View
-                        </button>
-
-                        {order.status !== "completed" && (
                           <select
                             value={order.status}
-                            onChange={(e) =>
-                              updateStatus(order.order_id, e.target.value)
-                            }
-                            className="border rounded px-2 py-1 text-sm"
+                            onChange={(event) => updateStatus(order.order_id, event.target.value)}
+                            className="rounded-full border border-slate-200 bg-white px-3 py-2 text-sm outline-none"
                           >
-                            {["pending", "completed"].map(
-                              (s) => (
-                                <option key={s} value={s}>
-                                  {s}
-                                </option>
-                              )
-                            )}
+                            {STATUS_OPTIONS.map((status) => (
+                              <option key={status} value={status}>
+                                {status}
+                              </option>
+                            ))}
                           </select>
-                        )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -193,77 +201,92 @@ const OrdersPanel = () => {
         </div>
       </main>
 
-      {/* 🪟 Order Details Modal */}
       {selectedOrder && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center z-50">
-          <div className="bg-white rounded-2xl shadow-lg p-6 w-[500px] relative">
-            <button
-              onClick={() => setSelectedOrder(null)}
-              className="absolute top-3 right-4 text-gray-400 hover:text-gray-600 text-xl"
-            >
-              ✕
-            </button>
-
-            <h3 className="text-xl font-semibold mb-4 text-gray-800">
-              Order #{selectedOrder.order_no}
-            </h3>
-
-            <div className="text-sm text-gray-600 space-y-1 mb-4">
-              <p>
-                <strong>Customer:</strong> {selectedOrder.customer_name}
-              </p>
-              <p>
-                <strong>Amount:</strong> ₹{selectedOrder.amount}
-              </p>
-              <p>
-                <strong>Payment:</strong> {selectedOrder.payment_mode}
-              </p>
-              <p>
-                <strong>Status:</strong>{" "}
-                <span
-                  className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(
-                    selectedOrder.status
-                  )}`}
-                >
-                  {selectedOrder.status}
-                </span>
-              </p>
-              <p>
-                <strong>Date:</strong>{" "}
-                {new Date(selectedOrder.order_date).toLocaleString()}
-              </p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4">
+          <div className="w-full max-w-2xl rounded-3xl bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-[0.25em] text-orange-500">
+                  Order #{selectedOrder.order.order_no || selectedOrder.order.order_id}
+                </p>
+                <h3 className="mt-2 text-2xl font-bold text-slate-900">
+                  ₹{Number(selectedOrder.order.amount || 0).toFixed(2)}
+                </h3>
+              </div>
+              <button
+                onClick={() => setSelectedOrder(null)}
+                className="rounded-full bg-slate-100 px-3 py-2 text-sm font-medium text-slate-600"
+              >
+                Close
+              </button>
             </div>
 
-            <h4 className="font-semibold text-gray-700 mb-2">Items:</h4>
-            <ul className="bg-gray-50 rounded-lg p-3 text-sm text-gray-700 mb-4">
-              {selectedOrder.items && selectedOrder.items.length > 0 ? (
-                selectedOrder.items.map((item, i) => (
-                  <li
-                    key={i}
-                    className="flex justify-between border-b last:border-none py-1"
-                  >
-                    <span>{item.name}</span>
-                    <span>x{item.quantity}</span>
-                  </li>
-                ))
-              ) : (
-                <p className="text-gray-400 text-center py-2">
-                  No item details available
-                </p>
-              )}
-            </ul>
+            {detailsLoading ? (
+              <div className="flex justify-center py-12">
+                <Loader2 className="animate-spin text-orange-500" size={28} />
+              </div>
+            ) : (
+              <>
+                <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                  <DetailCard label="Customer ID" value={selectedOrder.order.user_id} />
+                  <DetailCard label="Payment" value={selectedOrder.order.payment_mode} />
+                  <DetailCard label="Status" value={selectedOrder.order.status} />
+                  <DetailCard
+                    label="Placed at"
+                    value={new Date(selectedOrder.order.order_date).toLocaleString()}
+                  />
+                </div>
 
-            <button
-              onClick={() => setSelectedOrder(null)}
-              className="w-full bg-orange-500 text-white py-2 rounded-lg font-medium hover:bg-orange-600 transition"
-            >
-              Close
-            </button>
+                <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-5">
+                  <h4 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
+                    Items
+                  </h4>
+                  <div className="mt-4 space-y-3">
+                    {selectedOrder.items.map((item) => (
+                      <div
+                        key={`${selectedOrder.order.order_id}-${item.name}`}
+                        className="flex items-center justify-between rounded-2xl bg-white px-4 py-3"
+                      >
+                        <div>
+                          <p className="font-medium text-slate-900">{item.name}</p>
+                          <p className="text-sm text-slate-500">₹{item.cost} each</p>
+                        </div>
+                        <span className="text-sm font-semibold text-slate-800">x{item.quantity}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
     </div>
   );
+};
+
+const DetailCard = ({ label, value }) => (
+  <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">{label}</p>
+    <p className="mt-2 text-sm font-medium text-slate-900">{value || "N/A"}</p>
+  </div>
+);
+
+const getStatusColor = (status) => {
+  switch (status) {
+    case "pending":
+      return "bg-amber-100 text-amber-700";
+    case "preparing":
+      return "bg-orange-100 text-orange-700";
+    case "ready":
+      return "bg-emerald-100 text-emerald-700";
+    case "completed":
+      return "bg-slate-100 text-slate-700";
+    case "cancelled":
+      return "bg-rose-100 text-rose-700";
+    default:
+      return "bg-slate-100 text-slate-700";
+  }
 };
 
 export default OrdersPanel;

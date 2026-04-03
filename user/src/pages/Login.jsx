@@ -15,7 +15,7 @@ const Login = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await axios.post("/auth/login", formData);
+      await axios.post("/auth/login", formData);
       navigate("/home");
     } catch (err) {
       alert(err.response?.data?.message || "Login failed");

@@ -4,31 +4,35 @@ import { Trash2 } from "lucide-react";
 
 const CartItem = ({ item, onIncrease, onDecrease, onRemove }) => {
   return (
-    <div className="flex justify-between items-center p-4 bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-all">
+    <div className="flex flex-col gap-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:shadow-md sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <h3 className="text-lg font-semibold text-gray-800">{item.name}</h3>
-        <p className="text-gray-500 text-sm">{item.category}</p>
-        <p className="text-orange-600 font-semibold mt-1">₹{item.cost}</p>
+        <h3 className="text-lg font-semibold text-slate-900">{item.name}</h3>
+        <p className="text-sm text-slate-500">{item.category}</p>
+        <p className="mt-2 text-sm font-semibold text-orange-600">
+          ₹{item.cost} each
+        </p>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between gap-3 sm:justify-end">
+        <div className="flex items-center gap-3 rounded-full bg-slate-100 px-2 py-1">
         <button
           onClick={() => onDecrease(item.item_id)}
-          className="bg-gray-100 text-gray-700 px-2 py-1 rounded-md hover:bg-gray-200"
+            className="h-9 w-9 rounded-full bg-white text-lg font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
         >
           −
         </button>
-        <span className="font-semibold">{item.quantity}</span>
+          <span className="min-w-6 text-center font-semibold text-slate-900">{item.quantity}</span>
         <button
           onClick={() => onIncrease(item.item_id)}
-          className="bg-gray-100 text-gray-700 px-2 py-1 rounded-md hover:bg-gray-200"
+            className="h-9 w-9 rounded-full bg-white text-lg font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
         >
           +
         </button>
+        </div>
 
         <button
           onClick={() => onRemove(item.item_id)}
-          className="text-red-500 hover:text-red-700 ml-3"
+          className="rounded-full p-2 text-red-500 transition hover:bg-red-50 hover:text-red-700"
         >
           <Trash2 size={18} />
         </button>

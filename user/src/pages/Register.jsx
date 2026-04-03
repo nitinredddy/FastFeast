@@ -9,7 +9,6 @@ const Register = () => {
     email: "",
     password: "",
     phone: "",
-    role: "customer",
   });
   const [loading, setLoading] = useState(false);
 
@@ -21,7 +20,7 @@ const Register = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await axios.post("/auth/register", formData);
+      await axios.post("/auth/register", formData);
       navigate("/home"); // ✅ auto redirect after register (token already in cookie)
     } catch (err) {
       alert(err.response?.data?.message || "Registration failed");

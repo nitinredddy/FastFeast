@@ -1,132 +1,142 @@
-import React, { useEffect, useState } from "react";
-import Sidebar from "../components/Sidebar";
-import Navbar from "../components/Navbar";
+import React, { useCallback, useEffect, useState } from "react";
 import axios from "../api/axios";
+import Navbar from "../components/Navbar";
+import Sidebar from "../components/Sidebar";
 
 const Dashboard = () => {
   const [stats, setStats] = useState({
     total_orders: 0,
+    today_orders: 0,
     active_menu: 0,
     low_stock: 0,
+    total_revenue: 0,
   });
   const [recentOrders, setRecentOrders] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // 🔸 Fetch dashboard stats
-  const fetchStats = async () => {
-    try {
-      const res = await axios.get("/admin/stats");
-      setStats(res.data);
-    } catch (err) {
-      console.error("Stats fetch failed:", err);
-    }
-  };
-
-  // 🔸 Fetch recent orders (show 5 latest)
-  const fetchRecentOrders = async () => {
-    try {
-      const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
-      const res = await axios.get(`/admin-routes?date=${today}`);
-      setRecentOrders(res.data.orders.slice(0, 5));
-
-    } catch (err) {
-      console.error("Orders fetch failed:", err);
-    }
-  };
-
-  useEffect(() => {
-    const initFetch = async () => {
-      setLoading(true);
-      await Promise.all([fetchStats(), fetchRecentOrders()]);
-      setLoading(false);
-    };
-
-    initFetch();
-
-    // 🔁 Auto-refresh every 30 seconds
-    const interval = setInterval(initFetch, 10000);
-    return () => clearInterval(interval);
+  const fetchStats = useCallback(async () => {
+    const res = await axios.get("/admin/stats");
+    setStats(res.data);
   }, []);
 
-  const handleRefresh = async () => {
-    setLoading(true);
-    await Promise.all([fetchStats(), fetchRecentOrders()]);
-    setLoading(false);
-  };
+  const fetchRecentOrders = useCallback(async () => {
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+    const res = await axios.get(`/admin-routes?date=${today}`);
+    setRecentOrders((res.data.orders || []).slice(0, 5));
+  }, []);
+
+  const refreshDashboard = useCallback(async () => {
+    try {
+      setLoading(true);
+      await Promise.all([fetchStats(), fetchRecentOrders()]);
+    } catch (err) {
+      console.error("Dashboard refresh failed:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchRecentOrders, fetchStats]);
+
+  useEffect(() => {
+    refreshDashboard();
+    const interval = setInterval(refreshDashboard, 15000);
+    return () => clearInterval(interval);
+  }, [refreshDashboard]);
+
+  const cards = [
+    { title: "Total Orders", value: stats.total_orders, tone: "bg-slate-900 text-white" },
+    { title: "Orders Today", value: stats.today_orders, tone: "bg-orange-500 text-white" },
+    { title: "Active Menu Items", value: stats.active_menu, tone: "bg-white text-slate-900" },
+    { title: "Low Stock Alerts", value: stats.low_stock, tone: "bg-rose-50 text-rose-700" },
+  ];
 
   return (
-    <div className="flex">
+    <div className="flex min-h-screen bg-slate-100">
       <Sidebar />
-      <main className="flex-1 bg-gray-50 min-h-screen">
-        <Navbar />
-        <div className="p-8">
-          {/* Title and refresh */}
-          <div className="flex items-center justify-between mb-6">
-            <h1 className="text-3xl font-semibold text-gray-800">
-              Dashboard Overview 👋
-            </h1>
-            <button
-              onClick={handleRefresh}
-              className="bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition"
-            >
-              Refresh
-            </button>
-          </div>
 
-          {/* Stats */}
+      <main className="flex-1">
+        <Navbar />
+
+        <div className="p-4 sm:p-6 lg:p-8">
+          <section className="rounded-[2rem] bg-slate-950 p-6 text-white shadow-xl sm:p-8">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-[0.3em] text-orange-300">
+                  Operations overview
+                </p>
+                <h1 className="mt-3 text-3xl font-bold">FastFeast service control center</h1>
+                <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">
+                  Monitor live order volume, menu readiness, and revenue trends from one screen.
+                </p>
+              </div>
+
+              <div className="rounded-3xl bg-white/10 px-5 py-4 backdrop-blur">
+                <p className="text-xs uppercase tracking-[0.3em] text-orange-200">Completed revenue today</p>
+                <p className="mt-2 text-3xl font-bold">₹{Number(stats.total_revenue || 0).toFixed(2)}</p>
+              </div>
+            </div>
+          </section>
+
           {loading ? (
-            <div className="flex justify-center items-center h-64">
-              <div className="animate-spin h-10 w-10 border-t-4 border-orange-500 rounded-full"></div>
+            <div className="flex justify-center py-12">
+              <div className="h-10 w-10 animate-spin rounded-full border-4 border-orange-200 border-t-orange-500" />
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <StatCard title="Total Orders" value={stats.total_orders} />
-                <StatCard title="Active Menu Items" value={stats.active_menu} />
-              </div>
+              <section className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                {cards.map((card) => (
+                  <div key={card.title} className={`rounded-3xl p-6 shadow-sm ${card.tone}`}>
+                    <p className="text-sm font-medium opacity-80">{card.title}</p>
+                    <p className="mt-4 text-4xl font-bold">{card.value}</p>
+                  </div>
+                ))}
+              </section>
 
-              {/* Recent Orders */}
-              <section>
-                <h2 className="text-2xl font-semibold mb-4 text-gray-800">
-                  Recent Orders 🧾
-                </h2>
+              <section className="mt-8 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <h2 className="text-2xl font-semibold text-slate-900">Recent orders</h2>
+                    <p className="mt-1 text-sm text-slate-500">
+                      Latest customer activity for today’s service window.
+                    </p>
+                  </div>
+                  <button
+                    onClick={refreshDashboard}
+                    className="rounded-2xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-orange-600"
+                  >
+                    Refresh
+                  </button>
+                </div>
+
                 {recentOrders.length === 0 ? (
-                  <p className="text-gray-600">No recent orders.</p>
+                  <div className="mt-6 rounded-2xl border border-dashed border-slate-200 p-8 text-center text-sm text-slate-500">
+                    No orders have been placed today.
+                  </div>
                 ) : (
-                  <div className="bg-white shadow-md rounded-xl overflow-hidden">
-                    <table className="w-full text-left">
-                      <thead className="bg-orange-100 text-gray-700 text-sm">
-                        <tr>
-                          <th className="p-3">Order No</th>
-                          <th className="p-3">Customer</th>
-                          <th className="p-3">Amount</th>
-                          <th className="p-3">Status</th>
-                          <th className="p-3">Payment</th>
-                          <th className="p-3">Date</th>
+                  <div className="mt-6 overflow-x-auto">
+                    <table className="min-w-full text-left text-sm">
+                      <thead className="text-slate-500">
+                        <tr className="border-b border-slate-200">
+                          <th className="px-3 py-3 font-medium">Order</th>
+                          <th className="px-3 py-3 font-medium">Customer</th>
+                          <th className="px-3 py-3 font-medium">Amount</th>
+                          <th className="px-3 py-3 font-medium">Status</th>
+                          <th className="px-3 py-3 font-medium">Payment</th>
+                          <th className="px-3 py-3 font-medium">Placed</th>
                         </tr>
                       </thead>
-                      <tbody className="text-sm">
+                      <tbody>
                         {recentOrders.map((order) => (
-                          <tr
-                            key={order.order_no}
-                            className="border-b hover:bg-orange-50 transition"
-                          >
-                            <td className="p-3 font-medium text-gray-800">
-                              #{order.order_no}
-                            </td>
-                            <td className="p-3">{order.customer_name}</td>
-                            <td className="p-3">₹{order.amount}</td>
-                            <td className="p-3">
-                              <span
-                                className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBadge(
-                                  order.status
-                                )}`}
-                              >
+                          <tr key={order.order_id} className="border-b border-slate-100 text-slate-700">
+                            <td className="px-3 py-4 font-semibold text-orange-600">#{order.order_no}</td>
+                            <td className="px-3 py-4">{order.customer_name}</td>
+                            <td className="px-3 py-4">₹{order.amount}</td>
+                            <td className="px-3 py-4">
+                              <span className={`rounded-full px-3 py-1 text-xs font-semibold ${getStatusBadge(order.status)}`}>
                                 {order.status}
                               </span>
                             </td>
-                            <td className="p-3">{order.payment_mode}</td>
-                            <td className="p-3 text-gray-500">
+                            <td className="px-3 py-4">{order.payment_mode}</td>
+                            <td className="px-3 py-4 text-slate-500">
                               {new Date(order.order_date).toLocaleString()}
                             </td>
                           </tr>
@@ -144,29 +154,20 @@ const Dashboard = () => {
   );
 };
 
-// 🔸 Stat card component
-const StatCard = ({ title, value }) => (
-  <div className="bg-white p-6 rounded-xl shadow-md text-center hover:shadow-lg transition">
-    <h3 className="text-gray-500 font-medium">{title}</h3>
-    <p className="text-3xl font-bold text-orange-600 mt-2">{value}</p>
-  </div>
-);
-
-// 🔸 Badge color based on order status
 function getStatusBadge(status) {
   switch (status) {
     case "pending":
-      return "bg-yellow-100 text-yellow-800";
+      return "bg-amber-100 text-amber-700";
     case "preparing":
-      return "bg-orange-100 text-orange-800";
+      return "bg-orange-100 text-orange-700";
     case "ready":
-      return "bg-green-100 text-green-800";
+      return "bg-emerald-100 text-emerald-700";
     case "completed":
-      return "bg-green-50 text-green-700";
+      return "bg-slate-100 text-slate-700";
     case "cancelled":
-      return "bg-red-100 text-red-800";
+      return "bg-rose-100 text-rose-700";
     default:
-      return "bg-gray-100 text-gray-800";
+      return "bg-slate-100 text-slate-700";
   }
 }
 

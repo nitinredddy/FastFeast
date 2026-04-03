@@ -1,4 +1,20 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-  
+
+:root {
+  color: #0f172a;
+  background: #fffaf5;
+  font-family: "Sora", "Segoe UI", sans-serif;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background: #fffaf5;
+  color: #0f172a;
+}
+
+* {
+  box-sizing: border-box;
+}

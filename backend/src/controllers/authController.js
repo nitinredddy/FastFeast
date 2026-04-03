@@ -36,7 +36,8 @@ const sendToken = (user, res, message) => {
 // ------------------------------------------------------
 export const register = async (req, res) => {
   try {
-    const { name, email, password, phone, role = "customer"} = req.body;
+    const { name, email, password, phone } = req.body;
+    const role = "customer";
 
     // check if user already exists
     const [exists] = await pool.query("SELECT * FROM User WHERE email = ?", [email]);
@@ -132,4 +133,3 @@ export const verifyUser = async (req, res) => {
     res.status(401).json({ valid: false, message: "Invalid or expired token" });
   }
 };
-

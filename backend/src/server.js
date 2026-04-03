@@ -11,7 +11,8 @@ import inventoryRoutes from "./routes/inventoryRoutes.js";
 import feedbackRoutes from "./routes/feedbackRoutes.js";
 import reportRoutes from "./routes/reportRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
-import adminOrderRoutes from "./routes/adminOrderRoutes.js"
+import adminOrderRoutes from "./routes/adminOrderRoutes.js";
+import pool from "./config/db.js";
 
 dotenv.config();
 const app = express();
@@ -30,7 +31,7 @@ app.use("/inventory", inventoryRoutes);
 app.use("/feedback", feedbackRoutes);
 app.use("/reports", reportRoutes);
 app.use("/admin", adminRoutes); // ✅ for dashboard stats
-app.use("/admin-routes", adminOrderRoutes)
+app.use("/admin-routes", adminOrderRoutes);
 
 // ✅ Root health check
 app.get("/", async (req, res) => {

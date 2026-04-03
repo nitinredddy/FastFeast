@@ -25,6 +25,8 @@ CREATE TABLE User (
     role ENUM('admin', 'customer', 'staff') DEFAULT 'customer'
 );
 
+
+
 -- -------------------------------
 -- TABLE: Menu
 -- -------------------------------
@@ -209,7 +211,7 @@ BEGIN
 
     -- Create new order
     INSERT INTO Orders (user_id, amount, payment_mode, pickup_time, order_no, status)
-    VALUES (p_user_id, 0, p_payment_mode, p_pickup_time, p_order_no, 'preparing');
+    VALUES (p_user_id, 0, p_payment_mode, p_pickup_time, p_order_no, 'pending');
 
     SET p_order_id = LAST_INSERT_ID();
 
@@ -252,13 +254,39 @@ BEGIN
 
     -- Allow only logical transitions
     IF (
-        (current_status = 'preparing' AND p_new_status IN ('ready', 'completed')) OR
+        (current_status = 'pending' AND p_new_status IN ('preparing', 'cancelled')) OR
+        (current_status = 'preparing' AND p_new_status IN ('ready', 'cancelled')) OR
         (current_status = 'ready' AND p_new_status = 'completed')
     ) THEN
         UPDATE Orders SET status = p_new_status WHERE order_id = p_order_id;
     ELSE
         SIGNAL SQLSTATE '45000'
         SET MESSAGE_TEXT = CONCAT('Invalid status transition from ', current_status, ' to ', p_new_status);
+    END IF;
+END //
+DELIMITER ;
+
+
+-- ===========================================================
+-- 🚫 PROCEDURE 3A: cancel_order
+-- Allows cancellation before the order is marked ready/completed
+-- ===========================================================
+DELIMITER //
+CREATE PROCEDURE cancel_order(IN p_order_id INT)
+BEGIN
+    DECLARE current_status VARCHAR(20);
+
+    SELECT status INTO current_status FROM Orders WHERE order_id = p_order_id;
+
+    IF current_status IS NULL THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Order not found';
+    END IF;
+
+    IF current_status IN ('pending', 'preparing') THEN
+        UPDATE Orders SET status = 'cancelled' WHERE order_id = p_order_id;
+    ELSE
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Only pending or preparing orders can be cancelled';
     END IF;
 END //
 DELIMITER ;
@@ -342,6 +370,21 @@ DELIMITER ;
 
 
 -- ===========================================================
+-- ⚙️ TRIGGER 1A: after_menu_insert
+-- Ensures inventory exists for newly added menu items
+-- ===========================================================
+DELIMITER //
+CREATE TRIGGER after_menu_insert
+AFTER INSERT ON Menu
+FOR EACH ROW
+BEGIN
+    INSERT INTO Inventory (item_id, stock_quantity)
+    VALUES (NEW.item_id, 0);
+END //
+DELIMITER ;
+
+
+-- ===========================================================
 -- ⚙️ TRIGGER 2: after_order_status_update
 -- Logs order status changes into OrderLogs
 -- ===========================================================
@@ -399,6 +442,43 @@ SELECT
 FROM Orders o
 JOIN User u ON o.user_id = u.user_id
 ORDER BY o.order_date DESC;
+
+
+-- ===========================================================
+-- 🧮 FUNCTION 2: CalculateDiscount
+-- Simple reporting helper used by the backend
+-- ===========================================================
+DELIMITER //
+CREATE FUNCTION CalculateDiscount(p_amount DECIMAL(10,2))
+RETURNS DECIMAL(10,2)
+DETERMINISTIC
+BEGIN
+    IF p_amount >= 500 THEN
+        RETURN ROUND(p_amount * 0.10, 2);
+    ELSEIF p_amount >= 250 THEN
+        RETURN ROUND(p_amount * 0.05, 2);
+    END IF;
+
+    RETURN 0;
+END //
+DELIMITER ;
+
+
+-- ===========================================================
+-- 👤 PROCEDURE 5: GetUserTotalSpent
+-- Aggregates total completed spend for a user
+-- ===========================================================
+DELIMITER //
+CREATE PROCEDURE GetUserTotalSpent(IN p_user_id INT)
+BEGIN
+    SELECT 
+        p_user_id AS user_id,
+        COALESCE(SUM(amount), 0) AS total_spent
+    FROM Orders
+    WHERE user_id = p_user_id
+      AND status = 'completed';
+END //
+DELIMITER ;
 
 -- ===========================================================
 -- ✅ END OF BACKEND-INTEGRATED SECTION

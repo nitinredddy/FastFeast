@@ -6,14 +6,12 @@ import OrdersPanel from "./pages/OrdersPanel.jsx";
 import Inventory from "./pages/Inventory.jsx";
 import Login from "./pages/Login.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
-import Register from "./pages/Register.jsx";
 import Feedback from "./pages/Feedback.jsx";
 
 function App() {
   return (
     <Router>
       <Routes>
-        <Route path="/register" element={<Register />} />
         <Route path="/login" element={<Login />} />
 
         <Route
