@@ -103,9 +103,40 @@ export const toggleAvailability = async (req, res) => {
 export const deleteMenuItem = async (req, res) => {
   try {
     const { id } = req.params;
+
+    const [[menuItem]] = await pool.query(
+      "SELECT item_id, name FROM Menu WHERE item_id = ?",
+      [id]
+    );
+
+    if (!menuItem) {
+      return res.status(404).json({ message: "Menu item not found" });
+    }
+
+    const [[orderRefs]] = await pool.query(
+      "SELECT COUNT(*) AS total FROM OrderItem WHERE item_id = ?",
+      [id]
+    );
+    const [[feedbackRefs]] = await pool.query(
+      "SELECT COUNT(*) AS total FROM Feedback WHERE item_id = ?",
+      [id]
+    );
+
+    if (orderRefs.total > 0 || feedbackRefs.total > 0) {
+      await pool.query(
+        "UPDATE Menu SET availability = FALSE WHERE item_id = ?",
+        [id]
+      );
+
+      return res.json({
+        message: `${menuItem.name} has existing history, so it was archived by marking it unavailable instead of being deleted.`,
+        archived: true,
+      });
+    }
+
     await pool.query("DELETE FROM Inventory WHERE item_id = ?", [id]);
     await pool.query("DELETE FROM Menu WHERE item_id = ?", [id]);
-    res.json({ message: "Item deleted successfully" });
+    res.json({ message: "Item deleted successfully", archived: false });
   } catch (err) {
     console.error("Error deleting menu item:", err);
     res.status(500).json({ message: "Failed to delete item" });

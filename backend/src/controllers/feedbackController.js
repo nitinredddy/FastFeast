@@ -44,3 +44,43 @@ export const getAllFeedback = async (req, res) => {
     res.status(500).json({ message: "Failed to fetch feedback" });
   }
 };
+
+export const getFeedbackSummary = async (req, res) => {
+  try {
+    const [[totals]] = await pool.query(`
+      SELECT
+        COUNT(*) AS total_feedback,
+        COUNT(DISTINCT item_id) AS items_covered,
+        COUNT(DISTINCT user_id) AS customers_participated
+      FROM Feedback
+    `);
+
+    const [topItems] = await pool.query(`
+      SELECT
+        m.name AS item_name,
+        COUNT(*) AS feedback_count
+      FROM Feedback f
+      JOIN Menu m ON f.item_id = m.item_id
+      GROUP BY f.item_id, m.name
+      ORDER BY feedback_count DESC, m.name ASC
+      LIMIT 5
+    `);
+
+    const [recentActivity] = await pool.query(`
+      SELECT DATE(feedback_date) AS feedback_day, COUNT(*) AS entries
+      FROM Feedback
+      GROUP BY DATE(feedback_date)
+      ORDER BY feedback_day DESC
+      LIMIT 7
+    `);
+
+    res.json({
+      totals,
+      topItems,
+      recentActivity: recentActivity.reverse(),
+    });
+  } catch (err) {
+    console.error("Error fetching feedback summary:", err);
+    res.status(500).json({ message: "Failed to fetch feedback summary" });
+  }
+};

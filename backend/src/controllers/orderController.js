@@ -39,10 +39,8 @@ export const createOrder = async (req, res) => {
       `SELECT 
         m.item_id,
         m.name,
-        m.availability,
-        COALESCE(i.stock_quantity, 0) AS stock_quantity
+        m.availability
       FROM Menu m
-      LEFT JOIN Inventory i ON i.item_id = m.item_id
       WHERE m.item_id IN (${placeholders})`,
       itemIds
     );
@@ -56,12 +54,6 @@ export const createOrder = async (req, res) => {
 
       if (!currentItem.availability) {
         return res.status(400).json({ message: `${currentItem.name} is currently unavailable` });
-      }
-
-      if (currentItem.stock_quantity < item.quantity) {
-        return res.status(400).json({
-          message: `Only ${currentItem.stock_quantity} serving(s) left for ${currentItem.name}`,
-        });
       }
     }
 
@@ -95,7 +87,15 @@ export const createOrder = async (req, res) => {
 export const getOrderById = async (req, res) => {
   try {
     const [order] = await pool.query(
-      "SELECT * FROM Orders WHERE order_id = ?",
+      `SELECT 
+        o.*,
+        u.name AS customer_name,
+        u.email AS customer_email,
+        u.phone AS customer_phone,
+        NULL AS customer_address
+      FROM Orders o
+      JOIN User u ON o.user_id = u.user_id
+      WHERE o.order_id = ?`,
       [req.params.id]
     );
 
@@ -108,9 +108,13 @@ export const getOrderById = async (req, res) => {
     }
 
     const [items] = await pool.query(
-      `SELECT m.name, oi.quantity, m.cost 
+      `SELECT 
+        oi.item_id,
+        COALESCE(m.name, CONCAT('Item #', oi.item_id)) AS name,
+        oi.quantity,
+        COALESCE(m.cost, 0) AS cost
        FROM OrderItem oi 
-       JOIN Menu m ON oi.item_id = m.item_id 
+       LEFT JOIN Menu m ON oi.item_id = m.item_id 
        WHERE oi.order_id = ?`,
       [req.params.id]
     );
