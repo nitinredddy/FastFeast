@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Calendar, Eye, Loader2 } from "lucide-react";
+import { Calendar, Eye, Loader2, Search } from "lucide-react";
 import axios from "../api/axios";
 import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
@@ -12,10 +12,12 @@ const OrdersPanel = () => {
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
+  const [detailsError, setDetailsError] = useState("");
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [revenue, setRevenue] = useState(0);
   const [statusFilter, setStatusFilter] = useState("active");
   const [notice, setNotice] = useState({ message: "", tone: "info" });
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     fetchOrders(date);
@@ -43,7 +45,7 @@ const OrdersPanel = () => {
       fetchOrders(date);
 
       if (selectedOrder?.order?.order_id === id) {
-        handleViewOrder(id);
+        handleViewOrder(selectedOrder.order);
       }
     } catch (err) {
       console.error("Order status update error:", err);
@@ -54,34 +56,54 @@ const OrdersPanel = () => {
     }
   };
 
-  const handleViewOrder = async (orderId) => {
+  const handleViewOrder = async (order) => {
     try {
+      setDetailsError("");
+      setSelectedOrder((current) => ({
+        order,
+        items: current?.order?.order_id === order.order_id ? current.items || [] : [],
+      }));
       setDetailsLoading(true);
-      const res = await axios.get(`/admin-routes/${orderId}`);
+      const res = await axios.get(`/admin-routes/${order.order_id}`);
       setSelectedOrder(res.data);
     } catch (err) {
       console.error("Order details fetch error:", err);
       setNotice({ message: "Failed to load order details.", tone: "error" });
+      setDetailsError(err.response?.data?.message || "Failed to load order details.");
     } finally {
       setDetailsLoading(false);
     }
   };
 
+  const counters = useMemo(
+    () => ({
+      active: orders.filter((order) => ["pending", "preparing", "ready"].includes(order.status)).length,
+      ready: orders.filter((order) => order.status === "ready").length,
+      completed: orders.filter((order) => order.status === "completed").length,
+      cancelled: orders.filter((order) => order.status === "cancelled").length,
+    }),
+    [orders]
+  );
+
   const filteredOrders = useMemo(() => {
-    if (statusFilter === "active") {
-      return orders.filter((order) => ["pending", "preparing", "ready"].includes(order.status));
-    }
+    const normalizedSearch = search.trim().toLowerCase();
 
-    if (statusFilter === "completed") {
-      return orders.filter((order) => order.status === "completed");
-    }
+    return orders.filter((order) => {
+      const statusMatch =
+        statusFilter === "all"
+          ? true
+          : statusFilter === "active"
+          ? ["pending", "preparing", "ready"].includes(order.status)
+          : order.status === statusFilter;
 
-    if (statusFilter === "cancelled") {
-      return orders.filter((order) => order.status === "cancelled");
-    }
+      const searchMatch =
+        normalizedSearch === "" ||
+        order.customer_name?.toLowerCase().includes(normalizedSearch) ||
+        String(order.order_no).includes(normalizedSearch);
 
-    return orders;
-  }, [orders, statusFilter]);
+      return statusMatch && searchMatch;
+    });
+  }, [orders, search, statusFilter]);
 
   return (
     <div className="flex min-h-screen bg-slate-100">
@@ -101,7 +123,7 @@ const OrdersPanel = () => {
                 </p>
                 <h2 className="mt-2 text-3xl font-bold text-slate-900">Run today’s order queue</h2>
                 <p className="mt-2 text-sm text-slate-500">
-                  Move orders from pending to pickup-ready while keeping an eye on completed revenue.
+                  Search orders quickly, move statuses safely, and open customer details when needed.
                 </p>
               </div>
 
@@ -117,15 +139,30 @@ const OrdersPanel = () => {
             </div>
           </section>
 
-          <section className="mt-6 grid gap-4 lg:grid-cols-[1fr_auto]">
-            <div className="rounded-3xl bg-slate-950 p-5 text-white shadow-sm">
-              <p className="text-xs uppercase tracking-[0.3em] text-orange-300">Completed revenue</p>
-              <p className="mt-2 text-3xl font-bold">₹{revenue.toFixed(2)}</p>
+          <section className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+            <MetricCard label="Completed revenue" value={`₹${revenue.toFixed(2)}`} tone="dark" />
+            <MetricCard label="Active orders" value={counters.active} />
+            <MetricCard label="Ready now" value={counters.ready} />
+            <MetricCard label="Completed" value={counters.completed} />
+            <MetricCard label="Cancelled" value={counters.cancelled} />
+          </section>
+
+          <section className="mt-6 flex flex-col gap-4 rounded-3xl bg-white p-5 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+            <div className="relative w-full lg:max-w-sm">
+              <Search className="absolute left-4 top-3.5 text-slate-400" size={18} />
+              <input
+                type="text"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search by order no or customer..."
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-11 pr-4 text-sm outline-none focus:border-orange-400 focus:bg-white"
+              />
             </div>
 
             <div className="flex flex-wrap gap-2">
               {[
                 { key: "active", label: "Active" },
+                { key: "ready", label: "Ready" },
                 { key: "completed", label: "Completed" },
                 { key: "cancelled", label: "Cancelled" },
                 { key: "all", label: "All" },
@@ -136,7 +173,7 @@ const OrdersPanel = () => {
                   className={`rounded-full px-4 py-2 text-sm font-medium transition ${
                     statusFilter === item.key
                       ? "bg-orange-500 text-white"
-                      : "bg-white text-slate-600 shadow-sm hover:bg-orange-50 hover:text-orange-600"
+                      : "bg-slate-100 text-slate-600 hover:bg-orange-50 hover:text-orange-600"
                   }`}
                 >
                   {item.label}
@@ -151,7 +188,7 @@ const OrdersPanel = () => {
             </div>
           ) : filteredOrders.length === 0 ? (
             <div className="mt-6 rounded-3xl border border-dashed border-slate-200 bg-white p-10 text-center text-sm text-slate-500 shadow-sm">
-              No matching orders found for this date.
+              No matching orders found for this view.
             </div>
           ) : (
             <div className="mt-6 overflow-x-auto rounded-3xl bg-white shadow-sm">
@@ -163,6 +200,7 @@ const OrdersPanel = () => {
                     <th className="px-4 py-3 font-medium">Amount</th>
                     <th className="px-4 py-3 font-medium">Status</th>
                     <th className="px-4 py-3 font-medium">Payment</th>
+                    <th className="px-4 py-3 font-medium">Placed</th>
                     <th className="px-4 py-3 font-medium">Actions</th>
                   </tr>
                 </thead>
@@ -178,10 +216,13 @@ const OrdersPanel = () => {
                         </span>
                       </td>
                       <td className="px-4 py-4">{order.payment_mode}</td>
+                      <td className="px-4 py-4 text-slate-500">
+                        {new Date(order.order_date).toLocaleString()}
+                      </td>
                       <td className="px-4 py-4">
                         <div className="flex flex-wrap items-center gap-2">
                           <button
-                            onClick={() => handleViewOrder(order.order_id)}
+                            onClick={() => handleViewOrder(order)}
                             className="flex items-center gap-1 rounded-full bg-slate-100 px-3 py-2 font-medium text-slate-700 transition hover:bg-slate-200"
                           >
                             <Eye size={15} />
@@ -212,7 +253,7 @@ const OrdersPanel = () => {
 
       {selectedOrder && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4">
-          <div className="w-full max-w-2xl rounded-3xl bg-white p-6 shadow-2xl">
+          <div className="w-full max-w-3xl rounded-3xl bg-white p-6 shadow-2xl">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-sm font-semibold uppercase tracking-[0.25em] text-orange-500">
@@ -236,24 +277,38 @@ const OrdersPanel = () => {
               </div>
             ) : (
               <>
-                <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                  <DetailCard label="Customer ID" value={selectedOrder.order.user_id} />
+                <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <DetailCard label="Customer" value={selectedOrder.order.customer_name} />
+                  <DetailCard label="Email" value={selectedOrder.order.customer_email} />
+                  <DetailCard label="Phone" value={selectedOrder.order.customer_phone} />
                   <DetailCard label="Payment" value={selectedOrder.order.payment_mode} />
                   <DetailCard label="Status" value={selectedOrder.order.status} />
                   <DetailCard
-                    label="Placed at"
-                    value={new Date(selectedOrder.order.order_date).toLocaleString()}
+                    label="Pickup time"
+                    value={selectedOrder.order.pickup_time || "Not specified"}
                   />
+                </div>
+
+                <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Address</p>
+                  <p className="mt-2 text-sm text-slate-700">
+                    {selectedOrder.order.customer_address || "No address provided"}
+                  </p>
                 </div>
 
                 <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-5">
                   <h4 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
                     Items
                   </h4>
+                  {detailsError && (
+                    <div className="mt-4 rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                      {detailsError}
+                    </div>
+                  )}
                   <div className="mt-4 space-y-3">
-                    {selectedOrder.items.map((item) => (
+                    {(selectedOrder.items || []).map((item) => (
                       <div
-                        key={`${selectedOrder.order.order_id}-${item.name}`}
+                        key={`${selectedOrder.order.order_id}-${item.item_id || item.name}`}
                         className="flex items-center justify-between rounded-2xl bg-white px-4 py-3"
                       >
                         <div>
@@ -263,6 +318,11 @@ const OrdersPanel = () => {
                         <span className="text-sm font-semibold text-slate-800">x{item.quantity}</span>
                       </div>
                     ))}
+                    {!detailsLoading && !detailsError && (!selectedOrder.items || selectedOrder.items.length === 0) && (
+                      <div className="rounded-2xl bg-white px-4 py-6 text-center text-sm text-slate-500">
+                        No item details found for this order.
+                      </div>
+                    )}
                   </div>
                 </div>
               </>
@@ -273,6 +333,17 @@ const OrdersPanel = () => {
     </div>
   );
 };
+
+const MetricCard = ({ label, value, tone = "light" }) => (
+  <div
+    className={`rounded-3xl p-5 shadow-sm ${
+      tone === "dark" ? "bg-slate-950 text-white" : "bg-white text-slate-900"
+    }`}
+  >
+    <p className={`text-sm font-medium ${tone === "dark" ? "text-slate-300" : "text-slate-500"}`}>{label}</p>
+    <p className="mt-3 text-3xl font-bold">{value}</p>
+  </div>
+);
 
 const DetailCard = ({ label, value }) => (
   <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">

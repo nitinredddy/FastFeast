@@ -13,6 +13,8 @@ const MenuManager = () => {
   const [editId, setEditId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState({ message: "", tone: "info" });
+  const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
 
   useEffect(() => {
     fetchMenu();
@@ -90,6 +92,14 @@ const MenuManager = () => {
       setNotice({ message: "Failed to update availability.", tone: "error" });
     }
   };
+
+  const filteredMenu = menu.filter((item) => {
+    const searchMatch = item.name.toLowerCase().includes(search.toLowerCase());
+    const categoryMatch = categoryFilter === "all" || item.category === categoryFilter;
+    return searchMatch && categoryMatch;
+  });
+
+  const categories = ["all", ...new Set(menu.map((item) => item.category).filter(Boolean))];
 
   return (
     <div className="flex min-h-screen bg-slate-100">
@@ -202,12 +212,33 @@ const MenuManager = () => {
           </section>
 
           <section className="mt-6 rounded-3xl bg-white p-6 shadow-sm">
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <h3 className="text-2xl font-semibold text-slate-900">Menu list</h3>
                 <p className="mt-1 text-sm text-slate-500">
                   Toggle item availability instantly or jump into edit mode when details change.
                 </p>
+              </div>
+
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Search menu item..."
+                  className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-orange-400 focus:bg-white"
+                />
+                <select
+                  value={categoryFilter}
+                  onChange={(event) => setCategoryFilter(event.target.value)}
+                  className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-orange-400 focus:bg-white"
+                >
+                  {categories.map((category) => (
+                    <option key={category} value={category}>
+                      {category === "all" ? "All categories" : category}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
@@ -228,7 +259,7 @@ const MenuManager = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {menu.map((item) => (
+                    {filteredMenu.map((item) => (
                       <tr key={item.item_id} className="border-b border-slate-100 text-slate-700">
                         <td className="px-3 py-4 font-medium text-slate-900">{item.name}</td>
                         <td className="px-3 py-4">{item.category}</td>
@@ -268,6 +299,13 @@ const MenuManager = () => {
                         </td>
                       </tr>
                     ))}
+                    {filteredMenu.length === 0 && (
+                      <tr>
+                        <td colSpan="5" className="px-3 py-6 text-center text-slate-500">
+                          No menu items match the current filters.
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>

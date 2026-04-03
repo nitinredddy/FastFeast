@@ -9,6 +9,8 @@ const Inventory = () => {
   const [loading, setLoading] = useState(true);
   const [drafts, setDrafts] = useState({});
   const [notice, setNotice] = useState({ message: "", tone: "info" });
+  const [search, setSearch] = useState("");
+  const [showLowStockOnly, setShowLowStockOnly] = useState(false);
 
   useEffect(() => {
     fetchInventory();
@@ -47,6 +49,12 @@ const Inventory = () => {
     }
   };
 
+  const filteredItems = items.filter((item) => {
+    const searchMatch = item.name.toLowerCase().includes(search.toLowerCase());
+    const stockMatch = !showLowStockOnly || Number(item.stock_quantity) <= 10;
+    return searchMatch && stockMatch;
+  });
+
   return (
     <div className="flex min-h-screen bg-slate-100">
       <Sidebar />
@@ -62,6 +70,27 @@ const Inventory = () => {
             <p className="mt-2 text-sm text-slate-500">
               Track stock levels, spot low inventory, and keep the live menu accurate.
             </p>
+          </section>
+
+          <section className="mt-6 flex flex-col gap-4 rounded-3xl bg-white p-5 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+            <input
+              type="text"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search item..."
+              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-orange-400 focus:bg-white lg:w-80"
+            />
+
+            <button
+              onClick={() => setShowLowStockOnly((current) => !current)}
+              className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                showLowStockOnly
+                  ? "bg-rose-500 text-white"
+                  : "bg-slate-100 text-slate-600 hover:bg-rose-50 hover:text-rose-600"
+              }`}
+            >
+              {showLowStockOnly ? "Showing low stock only" : "Filter low stock"}
+            </button>
           </section>
 
           {loading ? (
@@ -83,7 +112,7 @@ const Inventory = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {items.map((item) => {
+                  {filteredItems.map((item) => {
                     const isLowStock = Number(item.stock_quantity) <= 10;
 
                     return (
@@ -141,6 +170,13 @@ const Inventory = () => {
                       </tr>
                     );
                   })}
+                  {filteredItems.length === 0 && (
+                    <tr>
+                      <td colSpan="7" className="px-4 py-6 text-center text-slate-500">
+                        No inventory items match the current filters.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>

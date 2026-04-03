@@ -16,7 +16,14 @@ const Login = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      await axios.post("/auth/login", formData);
+      const res = await axios.post("/auth/login", formData);
+
+      if (res.data?.user?.role !== "customer") {
+        await axios.post("/auth/logout");
+        toast.error("Please use a customer account in the user app.");
+        return;
+      }
+
       toast.success("Login successful");
       navigate("/home");
     } catch (err) {
