@@ -9,18 +9,21 @@ import {
   LogOut,
 } from "lucide-react";
 import axios from "../api/axios.js";
+import Notice from "./Notice.jsx";
 
 const Sidebar = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const [notice, setNotice] = React.useState("");
 
   const logout = async () => {
     try {
       await axios.post("/auth/logout"); // ✅ removed /api prefix
+      setNotice("");
       navigate("/login");
     } catch (err) {
       console.error("Logout failed:", err);
-      alert("Failed to logout. Please try again.");
+      setNotice("Failed to logout. Please try again.");
     }
   };
 
@@ -39,8 +42,10 @@ const Sidebar = () => {
         FastFeast Admin
       </h2>
 
+      <Notice message={notice} />
+
       {/* Navigation Items */}
-      <nav className="flex flex-col gap-2 flex-grow">
+      <nav className="mt-4 flex flex-col gap-2 flex-grow">
         {menuItems.map((item) => {
           const active = location.pathname === item.path;
           return (

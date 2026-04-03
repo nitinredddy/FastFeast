@@ -7,12 +7,14 @@ import Inventory from "./pages/Inventory.jsx";
 import Login from "./pages/Login.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import Feedback from "./pages/Feedback.jsx";
+import AccessDenied from "./pages/AccessDenied.jsx";
 
 function App() {
   return (
     <Router>
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/forbidden" element={<AccessDenied />} />
 
         <Route
           path="/dashboard"
@@ -57,6 +59,7 @@ function App() {
         />
 
         <Route path="/" element={<Navigate to="/dashboard" />} />
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </Router>
   );

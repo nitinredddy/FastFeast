@@ -3,6 +3,7 @@ import { Pencil, ToggleLeft, ToggleRight, Trash2 } from "lucide-react";
 import axios from "../api/axios";
 import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
+import Notice from "../components/Notice.jsx";
 
 const emptyForm = { name: "", cost: "", category: "", stock_quantity: 0 };
 
@@ -11,6 +12,7 @@ const MenuManager = () => {
   const [form, setForm] = useState(emptyForm);
   const [editId, setEditId] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [notice, setNotice] = useState({ message: "", tone: "info" });
 
   useEffect(() => {
     fetchMenu();
@@ -21,9 +23,10 @@ const MenuManager = () => {
       setLoading(true);
       const res = await axios.get("/menu");
       setMenu(res.data || []);
+      setNotice({ message: "", tone: "info" });
     } catch (err) {
       console.error("Menu fetch error:", err);
-      alert("Failed to fetch menu");
+      setNotice({ message: "Failed to fetch menu.", tone: "error" });
     } finally {
       setLoading(false);
     }
@@ -44,10 +47,17 @@ const MenuManager = () => {
 
       setForm(emptyForm);
       setEditId(null);
+      setNotice({
+        message: editId ? "Menu item updated successfully." : "Menu item added successfully.",
+        tone: "success",
+      });
       fetchMenu();
     } catch (err) {
       console.error("Menu save error:", err);
-      alert(err.response?.data?.message || "Failed to save menu item");
+      setNotice({
+        message: err.response?.data?.message || "Failed to save menu item.",
+        tone: "error",
+      });
     }
   };
 
@@ -56,20 +66,28 @@ const MenuManager = () => {
 
     try {
       await axios.delete(`/menu/${id}`);
+      setNotice({ message: "Item deleted successfully.", tone: "success" });
       fetchMenu();
     } catch (err) {
       console.error("Menu delete error:", err);
-      alert(err.response?.data?.message || "Failed to delete item");
+      setNotice({
+        message: err.response?.data?.message || "Failed to delete item.",
+        tone: "error",
+      });
     }
   };
 
   const toggleAvailability = async (id, current) => {
     try {
       await axios.patch(`/menu/${id}/availability`, { availability: !current });
+      setNotice({
+        message: `Item ${current ? "marked unavailable" : "made available"}.`,
+        tone: "success",
+      });
       fetchMenu();
     } catch (err) {
       console.error("Availability update error:", err);
-      alert("Failed to update availability");
+      setNotice({ message: "Failed to update availability.", tone: "error" });
     }
   };
 
@@ -81,6 +99,8 @@ const MenuManager = () => {
         <Navbar />
 
         <div className="p-4 sm:p-6 lg:p-8">
+          <Notice message={notice.message} tone={notice.tone} />
+
           <section className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
             <div className="rounded-3xl bg-white p-6 shadow-sm">
               <p className="text-sm font-semibold uppercase tracking-[0.3em] text-orange-500">

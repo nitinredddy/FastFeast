@@ -6,20 +6,24 @@ export const getMenu = async (req, res) => {
   try {
     const { category, availableOnly } = req.query;
 
-    let query = "SELECT * FROM Menu";
+    let query = `SELECT 
+      m.*,
+      COALESCE(i.stock_quantity, 0) AS stock_quantity
+    FROM Menu m
+    LEFT JOIN Inventory i ON i.item_id = m.item_id`;
     const params = [];
 
     if (category && availableOnly) {
-      query += " WHERE category = ? AND availability = TRUE";
+      query += " WHERE m.category = ? AND m.availability = TRUE";
       params.push(category);
     } else if (category) {
-      query += " WHERE category = ?";
+      query += " WHERE m.category = ?";
       params.push(category);
     } else if (availableOnly) {
-      query += " WHERE availability = TRUE";
+      query += " WHERE m.availability = TRUE";
     }
 
-    query += " ORDER BY category, name";
+    query += " ORDER BY m.category, m.name";
 
     const [rows] = await pool.query(query, params);
     res.json(rows);

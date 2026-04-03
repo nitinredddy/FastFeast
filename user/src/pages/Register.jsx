@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import axios from "../api/axios";
 import { useNavigate, Link } from "react-router-dom";
+import toast from "react-hot-toast";
 
 const Register = () => {
   const navigate = useNavigate();
@@ -21,9 +22,10 @@ const Register = () => {
     setLoading(true);
     try {
       await axios.post("/auth/register", formData);
+      toast.success("Registration successful");
       navigate("/home"); // ✅ auto redirect after register (token already in cookie)
     } catch (err) {
-      alert(err.response?.data?.message || "Registration failed");
+      toast.error(err.response?.data?.message || "Registration failed");
     } finally {
       setLoading(false);
     }

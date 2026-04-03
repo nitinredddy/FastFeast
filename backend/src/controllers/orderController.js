@@ -22,7 +22,18 @@ export const createOrder = async (req, res) => {
       return res.status(400).json({ message: "Each order item needs a valid item_id and quantity" });
     }
 
-    const itemIds = [...new Set(items.map((item) => item.item_id))];
+    const mergedItems = Array.from(
+      items.reduce((map, item) => {
+        const existing = map.get(item.item_id);
+        map.set(item.item_id, {
+          item_id: item.item_id,
+          quantity: (existing?.quantity || 0) + item.quantity,
+        });
+        return map;
+      }, new Map()).values()
+    );
+
+    const itemIds = mergedItems.map((item) => item.item_id);
     const placeholders = itemIds.map(() => "?").join(", ");
     const [menuItems] = await pool.query(
       `SELECT 
@@ -37,7 +48,7 @@ export const createOrder = async (req, res) => {
     );
 
     const menuMap = new Map(menuItems.map((item) => [item.item_id, item]));
-    for (const item of items) {
+    for (const item of mergedItems) {
       const currentItem = menuMap.get(item.item_id);
       if (!currentItem) {
         return res.status(404).json({ message: `Item ${item.item_id} was not found` });
@@ -55,7 +66,7 @@ export const createOrder = async (req, res) => {
     }
 
     // Convert items array to JSON string for SQL procedure
-    const itemsJson = JSON.stringify(items);
+    const itemsJson = JSON.stringify(mergedItems);
 
     // ⚡ Call stored procedure to handle everything atomically
     const [resultSets] = await pool.query(
@@ -154,6 +165,11 @@ export const updateOrderStatus = async (req, res) => {
     res.json({ message: "Order status updated successfully ✅" });
   } catch (err) {
     console.error("❌ Error updating order status:", err);
+
+    if (err.sqlState === "45000" || err.code === "ER_SIGNAL_EXCEPTION") {
+      return res.status(400).json({ message: err.sqlMessage || "Invalid order status transition" });
+    }
+
     res.status(500).json({ message: "Failed to update order status" });
   }
 };
@@ -201,8 +217,7 @@ export const cancelOrder = async (req, res) => {
   } catch (err) {
     console.error("❌ Error cancelling order:", err);
 
-    if (err.code === "45000") {
-      // Custom SQL SIGNAL error
+    if (err.sqlState === "45000" || err.code === "ER_SIGNAL_EXCEPTION") {
       return res.status(400).json({ message: err.sqlMessage });
     }
 
