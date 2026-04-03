@@ -141,6 +141,7 @@ END //
 CREATE PROCEDURE update_order_status(IN p_order_id INT, IN p_new_status VARCHAR(20))
 BEGIN
     DECLARE current_status VARCHAR(20);
+    DECLARE error_message VARCHAR(255);
 
     SELECT status
     INTO current_status
@@ -160,8 +161,9 @@ BEGIN
         SET status = p_new_status
         WHERE order_id = p_order_id;
     ELSE
+        SET error_message = CONCAT('Invalid status transition from ', current_status, ' to ', p_new_status);
         SIGNAL SQLSTATE '45000'
-        SET MESSAGE_TEXT = CONCAT('Invalid status transition from ', current_status, ' to ', p_new_status);
+        SET MESSAGE_TEXT = error_message;
     END IF;
 END //
 
