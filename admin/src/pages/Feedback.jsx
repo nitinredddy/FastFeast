@@ -2,11 +2,13 @@ import React, { useEffect, useState } from "react";
 import Sidebar from "../components/Sidebar";
 import Navbar from "../components/Navbar";
 import axios from "../api/axios";
+import Notice from "../components/Notice.jsx";
 
 const Feedback = () => {
   const [feedback, setFeedback] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [notice, setNotice] = useState({ message: "", tone: "info" });
 
   useEffect(() => {
     fetchFeedback();
@@ -17,9 +19,10 @@ const Feedback = () => {
       setLoading(true);
       const res = await axios.get("/feedback");
       setFeedback(res.data);
+      setNotice({ message: "", tone: "info" });
     } catch (err) {
       console.error("Fetch feedback error:", err);
-      alert("Failed to fetch feedback");
+      setNotice({ message: "Failed to fetch feedback.", tone: "error" });
     } finally {
       setLoading(false);
     }
@@ -37,6 +40,8 @@ const Feedback = () => {
       <main className="flex-1 bg-gray-50 min-h-screen">
         <Navbar />
         <div className="p-8">
+          <Notice message={notice.message} tone={notice.tone} />
+
           <h2 className="text-2xl font-semibold mb-6">Customer Feedback 💬</h2>
 
           <div className="mb-4 flex justify-between items-center">

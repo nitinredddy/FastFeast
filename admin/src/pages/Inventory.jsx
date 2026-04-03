@@ -2,11 +2,13 @@ import React, { useEffect, useState } from "react";
 import axios from "../api/axios";
 import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
+import Notice from "../components/Notice.jsx";
 
 const Inventory = () => {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [drafts, setDrafts] = useState({});
+  const [notice, setNotice] = useState({ message: "", tone: "info" });
 
   useEffect(() => {
     fetchInventory();
@@ -20,9 +22,10 @@ const Inventory = () => {
       setDrafts(
         Object.fromEntries((res.data || []).map((item) => [item.item_id, item.stock_quantity]))
       );
+      setNotice({ message: "", tone: "info" });
     } catch (err) {
       console.error("Inventory fetch error:", err);
-      alert("Failed to fetch inventory");
+      setNotice({ message: "Failed to fetch inventory.", tone: "error" });
     } finally {
       setLoading(false);
     }
@@ -33,10 +36,14 @@ const Inventory = () => {
       await axios.patch(`/inventory/${itemId}`, {
         stock_quantity: Number(drafts[itemId]),
       });
+      setNotice({ message: "Inventory updated successfully.", tone: "success" });
       fetchInventory();
     } catch (err) {
       console.error("Stock update error:", err);
-      alert(err.response?.data?.message || "Failed to update stock");
+      setNotice({
+        message: err.response?.data?.message || "Failed to update stock.",
+        tone: "error",
+      });
     }
   };
 
@@ -48,6 +55,8 @@ const Inventory = () => {
         <Navbar />
 
         <div className="p-4 sm:p-6 lg:p-8">
+          <Notice message={notice.message} tone={notice.tone} />
+
           <section className="rounded-3xl bg-white p-6 shadow-sm">
             <h2 className="text-3xl font-bold text-slate-900">Inventory and availability</h2>
             <p className="mt-2 text-sm text-slate-500">

@@ -4,6 +4,6 @@ import { authenticateJWT, authorizeRoles } from "../middlewares/authMiddleware.j
 const router = express.Router();
 
 router.get("/user/:id/total", authenticateJWT, authorizeRoles("admin","staff"), userTotalSpent);
-router.get("/order/:id/discount", authenticateJWT, orderDiscount);
+router.get("/order/:id/discount", authenticateJWT, authorizeRoles("admin","staff"), orderDiscount);
 
 export default router;

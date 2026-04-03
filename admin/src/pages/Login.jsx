@@ -20,6 +20,7 @@ const Login = () => {
       if (role === "admin" || role === "staff") {
         navigate("/dashboard");
       } else {
+        await axios.post("/auth/logout");
         setError("You do not have admin access");
       }
     } catch (err) {

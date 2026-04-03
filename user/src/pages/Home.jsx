@@ -3,15 +3,14 @@ import { Clock3, Search, ShoppingCart, Sparkles } from "lucide-react";
 import toast from "react-hot-toast";
 import axios from "../api/axios";
 import Navbar from "../components/Navbar";
+import { getCartCount, getCart, saveCart } from "../utils/cart";
 
 const Home = () => {
   const [menu, setMenu] = useState([]);
   const [category, setCategory] = useState("All");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
-  const [cartCount, setCartCount] = useState(
-    JSON.parse(localStorage.getItem("fastfeast-cart"))?.length || 0
-  );
+  const [cartCount, setCartCount] = useState(getCartCount());
 
   const categories = ["All", "Breakfast", "Lunch", "Snacks", "Beverages", "Desserts"];
 
@@ -46,8 +45,13 @@ const Home = () => {
       return;
     }
 
-    const existingCart = JSON.parse(localStorage.getItem("fastfeast-cart")) || [];
+    const existingCart = getCart();
     const existingItem = existingCart.find((cartItem) => cartItem.item_id === item.item_id);
+
+    if (existingItem && existingItem.quantity >= Number(item.stock_quantity || 0)) {
+      toast.error(`Only ${item.stock_quantity} serving(s) left for ${item.name}.`);
+      return;
+    }
 
     const updatedCart = existingItem
       ? existingCart.map((cartItem) =>
@@ -57,8 +61,8 @@ const Home = () => {
         )
       : [...existingCart, { ...item, quantity: 1 }];
 
-    localStorage.setItem("fastfeast-cart", JSON.stringify(updatedCart));
-    setCartCount(updatedCart.length);
+    saveCart(updatedCart);
+    setCartCount(getCartCount());
     toast.success(`${item.name} added to cart.`);
   };
 

@@ -3,20 +3,26 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { LogOut, Menu, MessageSquareText, ShoppingCart, X } from "lucide-react";
 import axios from "../api/axios";
 import toast from "react-hot-toast";
+import { clearCart, getCartCount, subscribeToCart } from "../utils/cart";
 
-const Navbar = ({ cartCount = 0 }) => {
+const Navbar = ({ cartCount }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [derivedCartCount, setDerivedCartCount] = useState(getCartCount());
+
+  const visibleCartCount = cartCount ?? derivedCartCount;
 
   useEffect(() => {
     setIsMenuOpen(false);
   }, [location.pathname]);
 
+  useEffect(() => subscribeToCart(setDerivedCartCount), []);
+
   const handleLogout = async () => {
     try {
       await axios.post("/auth/logout");
-      localStorage.removeItem("fastfeast-cart");
+      clearCart();
       toast.success("Logged out successfully");
       navigate("/login");
     } catch (err) {
@@ -65,9 +71,9 @@ const Navbar = ({ cartCount = 0 }) => {
           >
             <ShoppingCart size={18} />
             Cart
-            {cartCount > 0 && (
+            {visibleCartCount > 0 && (
               <span className="rounded-full bg-orange-500 px-2 py-0.5 text-xs font-semibold text-white">
-                {cartCount}
+                {visibleCartCount}
               </span>
             )}
           </button>
@@ -116,7 +122,7 @@ const Navbar = ({ cartCount = 0 }) => {
                 Cart
               </span>
               <span className="rounded-full bg-orange-500 px-2 py-0.5 text-xs font-semibold text-white">
-                {cartCount}
+                {visibleCartCount}
               </span>
             </button>
 

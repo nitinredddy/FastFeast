@@ -3,19 +3,25 @@ import { Navigate } from "react-router-dom";
 import axios from "../api/axios.js";
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
-  const [authState, setAuthState] = useState({ loading: true, authorized: false });
+  const [authState, setAuthState] = useState({
+    loading: true,
+    authenticated: false,
+    authorized: false,
+  });
 
   useEffect(() => {
     axios
       .get("/auth/verify")
       .then((res) => {
         if (res.data.valid && allowedRoles.includes(res.data.user.role)) {
-          setAuthState({ loading: false, authorized: true });
+          setAuthState({ loading: false, authenticated: true, authorized: true });
+        } else if (res.data.valid) {
+          setAuthState({ loading: false, authenticated: true, authorized: false });
         } else {
-          setAuthState({ loading: false, authorized: false });
+          setAuthState({ loading: false, authenticated: false, authorized: false });
         }
       })
-      .catch(() => setAuthState({ loading: false, authorized: false }));
+      .catch(() => setAuthState({ loading: false, authenticated: false, authorized: false }));
   }, [allowedRoles]);
 
   if (authState.loading)
@@ -25,7 +31,11 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
       </div>
     );
 
-  return authState.authorized ? children : <Navigate to="/login" replace />;
+  if (!authState.authenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return authState.authorized ? children : <Navigate to="/forbidden" replace />;
 };
 
 export default ProtectedRoute;

@@ -3,6 +3,7 @@ import { Calendar, Eye, Loader2 } from "lucide-react";
 import axios from "../api/axios";
 import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
+import Notice from "../components/Notice.jsx";
 
 const STATUS_OPTIONS = ["pending", "preparing", "ready", "completed", "cancelled"];
 
@@ -14,6 +15,7 @@ const OrdersPanel = () => {
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [revenue, setRevenue] = useState(0);
   const [statusFilter, setStatusFilter] = useState("active");
+  const [notice, setNotice] = useState({ message: "", tone: "info" });
 
   useEffect(() => {
     fetchOrders(date);
@@ -25,9 +27,10 @@ const OrdersPanel = () => {
       const res = await axios.get(`/admin-routes?date=${selectedDate}`);
       setOrders(res.data.orders || []);
       setRevenue(Number(res.data.totalRevenue || 0));
+      setNotice({ message: "", tone: "info" });
     } catch (err) {
       console.error("Fetch orders error:", err);
-      alert("Failed to fetch orders");
+      setNotice({ message: "Failed to fetch orders.", tone: "error" });
     } finally {
       setLoading(false);
     }
@@ -36,6 +39,7 @@ const OrdersPanel = () => {
   const updateStatus = async (id, newStatus) => {
     try {
       await axios.patch(`/admin-routes/${id}`, { status: newStatus });
+      setNotice({ message: "Order status updated successfully.", tone: "success" });
       fetchOrders(date);
 
       if (selectedOrder?.order?.order_id === id) {
@@ -43,7 +47,10 @@ const OrdersPanel = () => {
       }
     } catch (err) {
       console.error("Order status update error:", err);
-      alert(err.response?.data?.message || "Failed to update status");
+      setNotice({
+        message: err.response?.data?.message || "Failed to update status.",
+        tone: "error",
+      });
     }
   };
 
@@ -54,7 +61,7 @@ const OrdersPanel = () => {
       setSelectedOrder(res.data);
     } catch (err) {
       console.error("Order details fetch error:", err);
-      alert("Failed to load order details");
+      setNotice({ message: "Failed to load order details.", tone: "error" });
     } finally {
       setDetailsLoading(false);
     }
@@ -84,6 +91,8 @@ const OrdersPanel = () => {
         <Navbar />
 
         <div className="p-4 sm:p-6 lg:p-8">
+          <Notice message={notice.message} tone={notice.tone} />
+
           <section className="rounded-3xl bg-white p-6 shadow-sm">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div>

@@ -4,19 +4,18 @@ import Navbar from "../components/Navbar";
 import CartItem from "../components/CartItem";
 import axios from "../api/axios";
 import toast from "react-hot-toast";
+import { clearCart, getCart, saveCart } from "../utils/cart";
 
 const Cart = () => {
   const navigate = useNavigate();
-  const [cart, setCart] = useState(
-    JSON.parse(localStorage.getItem("fastfeast-cart")) || []
-  );
+  const [cart, setCart] = useState(getCart());
   const [pickupTime, setPickupTime] = useState("");
   const [loading, setLoading] = useState(false);
   const [showUPIModal, setShowUPIModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   useEffect(() => {
-    localStorage.setItem("fastfeast-cart", JSON.stringify(cart));
+    saveCart(cart);
   }, [cart]);
 
   const subtotal = useMemo(
@@ -31,9 +30,19 @@ const Cart = () => {
 
   const handleIncrease = (id) => {
     setCart((current) =>
-      current.map((item) =>
-        item.item_id === id ? { ...item, quantity: item.quantity + 1 } : item
-      )
+      current.map((item) => {
+        if (item.item_id !== id) {
+          return item;
+        }
+
+        const nextQuantity = item.quantity + 1;
+        if (nextQuantity > Number(item.stock_quantity || 0)) {
+          toast.error(`Only ${item.stock_quantity} serving(s) left for ${item.name}.`);
+          return item;
+        }
+
+        return { ...item, quantity: nextQuantity };
+      })
     );
   };
 
@@ -70,7 +79,7 @@ const Cart = () => {
       toast.success("Order placed successfully");
       setCart([]);
       setPickupTime("");
-      localStorage.removeItem("fastfeast-cart");
+      clearCart();
       setShowSuccessModal(true);
 
       setTimeout(() => {
@@ -183,7 +192,7 @@ const Cart = () => {
                 : "bg-orange-500 text-white hover:bg-orange-600"
             }`}
           >
-            {loading ? "Placing order..." : "Confirm preorder"}
+      {loading ? "Placing order..." : "Confirm preorder"}
           </button>
         </aside>
       </div>

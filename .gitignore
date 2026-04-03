@@ -1,0 +1,27 @@
+# macOS / editor noise
+.DS_Store
+.codex
+
+# Root-only stray dependency installs
+/node_modules/
+
+# Dependency and build output
+**/node_modules/
+**/dist/
+**/dist-ssr/
+**/.vite/
+**/.vite-temp/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Local environment files
+.env
+**/.env
+!.env.example
+!**/.env.example

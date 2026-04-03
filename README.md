@@ -1,64 +1,177 @@
 # FastFeast
 
-FastFeast is a three-part food preorder system:
+FastFeast is a food pre-order platform with three apps in one workspace:
 
 - `user/`: customer-facing React app
 - `admin/`: admin and staff React app
-- `backend/`: Express + MySQL API
+- `backend/`: Express API with MySQL
 
-## What It Solves
+Customers can place orders before reaching the counter. Admin and staff users can manage menu items, inventory, feedback, and order flow from a separate dashboard.
 
-Customers can preorder food, avoid queue delays, and track pickup status.
-Admin and staff users can manage menu items, inventory, feedback, and the live order workflow.
+## Tech Stack
 
-## Local Setup
+- Frontend: React, Vite, Tailwind CSS
+- Backend: Express, MySQL, JWT, cookie-based auth
+- Workspace: npm workspaces
 
-1. Create the MySQL database using [fastfeast.sql](/Users/nitinreddy/Desktop/fastfeast/fastfeast.sql).
-2. Copy the env templates:
-   - `backend/.env.example` -> `backend/.env`
-   - `user/.env.example` -> `user/.env`
-   - `admin/.env.example` -> `admin/.env`
-3. Install dependencies in each app:
-   - `cd backend && npm install`
-   - `cd user && npm install`
-   - `cd admin && npm install`
-4. Start the apps:
-   - `cd backend && npm run dev`
-   - `cd user && npm run dev`
-   - `cd admin && npm run dev`
+## Repository Structure
+
+```text
+FastFeast/
+├── admin/     # admin and staff frontend
+├── backend/   # API server and database access
+├── docs/      # SQL dump and project report
+├── user/      # customer frontend
+└── package.json
+```
+
+## Prerequisites
+
+- Node.js 18+ recommended
+- npm
+- MySQL
+
+## Setup
+
+### 1. Install dependencies
+
+From the repository root:
+
+```bash
+npm install
+```
+
+### 2. Create the database
+
+Import the schema from:
+
+```text
+docs/fastfeast.sql
+```
+
+Create or use a MySQL database named `fastfeast`, then import that SQL file into it.
+
+### 3. Configure environment files
+
+Create these files from the existing examples:
+
+```text
+backend/.env
+user/.env
+admin/.env
+```
+
+Current example values:
+
+`backend/.env.example`
+
+```env
+DB_HOST=localhost
+DB_USER=your_mysql_user
+DB_PASS=your_password
+DB_NAME=fastfeast
+PORT=3000
+JWT_SECRET=change-me
+JWT_EXPIRES_IN=7d
+NODE_ENV=development
+CORS_ORIGIN_CUSTOMER=http://localhost:5173
+CORS_ORIGIN_ADMIN=http://localhost:5174
+```
+
+`user/.env.example`
+
+```env
+VITE_API_BASE_URL=http://localhost:3000
+```
+
+`admin/.env.example`
+
+```env
+VITE_API_BASE_URL=http://localhost:3000
+```
+
+## Running Locally
+
+Start each app from the repository root in separate terminals:
+
+```bash
+npm run dev:backend
+```
+
+```bash
+npm run dev:user
+```
+
+```bash
+npm run dev:admin
+```
+
+### Local URLs
+
+- Backend API: `http://localhost:3000`
+- User app: `http://localhost:5173`
+- Admin app: `http://localhost:5174`
+
+## Available Scripts
+
+From the repository root:
+
+```bash
+npm run dev:backend
+npm run dev:user
+npm run dev:admin
+npm run build:user
+npm run build:admin
+npm run lint:user
+npm run lint:admin
+```
+
+## Default Admin Login
+
+After importing `docs/fastfeast.sql`, the seeded admin account is:
+
+- Email: `admin@fastfeast.local`
+- Password: `Admin@123`
 
 ## Environment Variables
 
-Backend:
+### Backend
 
-- `PORT`
-- `DB_HOST`
-- `DB_USER`
-- `DB_PASS`
-- `DB_NAME`
-- `JWT_SECRET`
-- `CORS_ORIGIN_CUSTOMER`
-- `CORS_ORIGIN_ADMIN`
-- `NODE_ENV`
+- `DB_HOST`: MySQL host
+- `DB_USER`: MySQL username
+- `DB_PASS`: MySQL password
+- `DB_NAME`: database name
+- `PORT`: API server port
+- `JWT_SECRET`: JWT signing secret
+- `JWT_EXPIRES_IN`: token lifetime value
+- `NODE_ENV`: runtime mode
+- `CORS_ORIGIN_CUSTOMER`: allowed origin for the customer app
+- `CORS_ORIGIN_ADMIN`: allowed origin for the admin app
 
-Frontend apps:
+### Frontends
 
-- `VITE_API_BASE_URL`
+- `VITE_API_BASE_URL`: backend base URL used by both `user` and `admin`
+
+## Build
+
+To create production builds for the frontend apps:
+
+```bash
+npm run build:user
+npm run build:admin
+```
 
 ## Deployment Notes
 
-- Deploy the backend as a Node.js service with access to the MySQL instance.
-- Deploy `user/` and `admin/` as static Vite builds.
-- Set `VITE_API_BASE_URL` to the public backend URL for both frontends.
+- Deploy `backend/` as a Node.js service with MySQL access.
+- Deploy `user/` and `admin/` as static Vite apps.
+- Set `VITE_API_BASE_URL` in both frontends to the public backend URL.
 - Set backend CORS origins to the exact deployed frontend URLs.
-- Use HTTPS in production so secure cookie settings can be enabled safely.
+- Use a strong `JWT_SECRET` in production.
+- Use HTTPS in production if you want secure cookies enabled safely.
 
-## Recommended Production Shape
+## Notes
 
-- Backend: Render, Railway, Fly.io, EC2, or any Node host
-- Database: Managed MySQL
-- Frontends: Vercel, Netlify, or any static host
-
-## Current Verification Note
-
-The codebase has been updated for env-driven deployment, but local `vite build` verification is blocked in this environment because the installed Node version is `20.16.0` while Vite here requires `20.19+` or `22.12+`.
+- Environment files are per app. There is no root `.env`.
+- The backend uses npm workspace scripts from the repository root.
+- SQL and project documentation live in `docs/`.

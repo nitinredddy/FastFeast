@@ -1,0 +1,21 @@
+{
+  "name": "fastfeast",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "user",
+    "admin"
+  ],
+  "scripts": {
+    "dev:backend": "npm run dev -w ./backend",
+    "dev:user": "npm run dev -w ./user",
+    "dev:admin": "npm run dev -w ./admin",
+    "build:user": "npm run build -w ./user",
+    "build:admin": "npm run build -w ./admin",
+    "lint:user": "npm run lint -w ./user",
+    "lint:admin": "npm run lint -w ./admin"
+  },
+  "dependencies": {
+    "@openai/codex": "^0.118.0"
+  }
+}
