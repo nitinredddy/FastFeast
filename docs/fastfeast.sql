@@ -20,6 +20,14 @@ CREATE TABLE Menu (
     CHECK (cost > 0)
 );
 
+CREATE TABLE Inventory (
+    item_id INT PRIMARY KEY,
+    stock_quantity INT DEFAULT 0,
+    last_updated DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (item_id) REFERENCES Menu(item_id),
+    CHECK (stock_quantity >= 0)
+);
+
 CREATE TABLE Orders (
     order_id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT,
@@ -312,6 +320,23 @@ BEGIN
     SELECT COALESCE(SUM(amount), 0) AS totalRevenue
     FROM Orders
     WHERE DATE(order_date) = p_date AND payment_status = 'paid';
+END //
+
+CREATE TRIGGER after_order_insert
+AFTER INSERT ON OrderItem
+FOR EACH ROW
+BEGIN
+    UPDATE Inventory
+    SET stock_quantity = GREATEST(0, stock_quantity - NEW.quantity)
+    WHERE item_id = NEW.item_id;
+END //
+
+CREATE TRIGGER after_menu_insert
+AFTER INSERT ON Menu
+FOR EACH ROW
+BEGIN
+    INSERT INTO Inventory (item_id, stock_quantity)
+    VALUES (NEW.item_id, 0);
 END //
 
 CREATE TRIGGER after_order_status_update

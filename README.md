@@ -44,15 +44,25 @@ From the repository root:
 npm install
 ```
 
-### 2. Create the database
+### 2. Create and seed the database
 
-Import the schema from:
+Use these SQL files in order:
 
 ```text
 docs/fastfeast.sql
+docs/fastfeast_dump.sql
 ```
 
-Create or use a MySQL database named `fastfeast`, then import that SQL file into it.
+`docs/fastfeast.sql` sets up the database schema, procedures, triggers, and views.
+
+`docs/fastfeast_dump.sql` loads the sample application data snapshot, including users, menu items, orders, inventory, feedback, business settings, and payment ledger entries.
+
+Import them in this order:
+
+```bash
+mysql -u your_mysql_user -p < docs/fastfeast.sql
+mysql -u your_mysql_user -p fastfeast < docs/fastfeast_dump.sql
+```
 
 ### 3. Configure environment files
 
@@ -132,10 +142,18 @@ npm run lint:admin
 
 ## Default Admin Login
 
-After importing `docs/fastfeast.sql`, the seeded admin account is:
+If you import only [docs/fastfeast.sql](/home/harshith/Programms/FastFeast/docs/fastfeast.sql), the seeded admin account is:
 
 - Email: `admin@fastfeast.local`
 - Password: `Admin@123`
+
+If you also import [docs/fastfeast_dump.sql](/home/harshith/Programms/FastFeast/docs/fastfeast_dump.sql), the seed snapshot replaces the base records with sample users, menu data, orders, payments, inventory, feedback, and business settings.
+
+Sample admin accounts from the dump include:
+
+- Email: `admin@fastfeast.com`
+- Email: `admin123@fastfeast.com`
+- Email: `admin12345@gmail.com`
 
 ## Environment Variables
 
@@ -187,4 +205,4 @@ npm run build:admin
 - Environment files are per app. There is no root `.env`.
 - The backend uses npm workspace scripts from the repository root.
 - SQL and project documentation live in `docs/`.
-- The consolidated schema in [docs/fastfeast.sql](/Users/nitinreddy/Desktop/fastfeast/docs/fastfeast.sql) now includes the payments ledger and refund support.
+- The consolidated schema in [docs/fastfeast.sql](/home/harshith/Programms/FastFeast/docs/fastfeast.sql) includes the payments ledger and refund support.
