@@ -1,8 +1,9 @@
 // server.js
 import express from "express";
 import dotenv from "dotenv";
-import cookieParser from 'cookie-parser'
+import cookieParser from "cookie-parser";
 import cors from "cors";
+import { ALLOWED_CORS_ORIGINS, AUTH_TRUST_PROXY } from "./config/auth.js";
 
 import authRoutes from "./routes/authRoutes.js";
 import menuRoutes from "./routes/menuRoutes.js";
@@ -18,11 +19,24 @@ import { ensurePaymentSchema } from "./lib/paymentSchema.js";
 
 dotenv.config();
 const app = express();
-app.use(cookieParser())
-app.use(cors({
-    origin:[process.env.CORS_ORIGIN_CUSTOMER,process.env.CORS_ORIGIN_ADMIN],
-    credentials:true
-}));
+
+if (AUTH_TRUST_PROXY) {
+  app.set("trust proxy", 1);
+}
+
+app.use(cookieParser());
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (!origin || ALLOWED_CORS_ORIGINS.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error(`CORS blocked for origin: ${origin}`));
+    },
+    credentials: true,
+  })
+);
 app.use(express.json({
   verify: (req, res, buf) => {
     req.rawBody = buf;
@@ -57,6 +71,11 @@ app.use((req, res) => {
 // ✅ Global error handler
 app.use((err, req, res, next) => {
   console.error("🔥 Server error:", err);
+
+  if (err.message?.startsWith("CORS blocked")) {
+    return res.status(403).json({ message: err.message });
+  }
+
   res.status(500).json({ message: "Internal server error" });
 });
 

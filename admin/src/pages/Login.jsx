@@ -14,15 +14,8 @@ const Login = () => {
     setError("");
 
     try {
-      const res = await axios.post("/auth/login", form);
-      const role = res.data.user.role;
-
-      if (role === "admin" || role === "staff") {
-        navigate("/dashboard");
-      } else {
-        await axios.post("/auth/logout");
-        setError("You do not have admin access");
-      }
+      await axios.post("/auth/login", form);
+      navigate("/dashboard");
     } catch (err) {
       console.error(err);
       setError(err.response?.data?.message || "Login failed");

@@ -1,10 +1,11 @@
 // middleware/authMiddleware.js
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
+import { getTokenFromRequest } from "../utils/authCookies.js";
 dotenv.config();
 
 export const authenticateJWT = (req, res, next) => {
-  const token = req.cookies?.token; // ✅ read from cookie
+  const token = getTokenFromRequest(req);
   if (!token)
     return res.status(401).json({ message: "No token found in cookies" });
 
@@ -31,4 +32,3 @@ export const authorizeAdmin = (req, res, next) => {
   }
   next();
 };
-

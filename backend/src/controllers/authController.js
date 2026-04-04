@@ -1,24 +1,35 @@
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import pool from "../config/db.js";
+import {
+  AUTH_COOKIE_BASE_OPTIONS,
+  AUTH_COOKIE_MAX_AGE_MS,
+  JWT_EXPIRES_IN,
+} from "../config/auth.js";
 import dotenv from "dotenv";
+import {
+  getCookieNameForPortal,
+  getCookieNameForUserRole,
+  getPortalFromRequest,
+  getTokenFromRequest,
+} from "../utils/authCookies.js";
 dotenv.config();
 
 // ✅ helper function to generate token & send cookie
-const sendToken = (user, res, message) => {
+const sendToken = (req, user, res, message) => {
   const token = jwt.sign(
     { user_id: user.user_id, name: user.name, role: user.role },
     process.env.JWT_SECRET,
-    { expiresIn: "7d" }
+    { expiresIn: JWT_EXPIRES_IN }
   );
 
+  const cookieName = getCookieNameForUserRole(user.role);
+
   // Send token as HTTP-only cookie
-  res.cookie("token", token, {
-    httpOnly: true,       // prevents JS access (XSS protection)
-    secure: process.env.NODE_ENV === "production",        // true in production with HTTPS
-    sameSite: "lax",
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-  });
+  res.cookie(cookieName, token, { ...AUTH_COOKIE_BASE_OPTIONS, maxAge: AUTH_COOKIE_MAX_AGE_MS });
+
+  // Clear the legacy shared cookie if it exists from older sessions.
+  res.clearCookie("token", AUTH_COOKIE_BASE_OPTIONS);
 
   res.json({
     message,
@@ -64,7 +75,7 @@ export const register = async (req, res) => {
     const newUser = rows[0];
 
     // ✅ auto-login after register
-    sendToken(newUser, res, "Registered and logged in successfully");
+    sendToken(req, newUser, res, "Registered and logged in successfully");
   } catch (err) {
     console.error("Registration error:", err);
     if (err.code === "ER_BAD_NULL_ERROR") {
@@ -85,6 +96,7 @@ export const register = async (req, res) => {
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
+    const portal = getPortalFromRequest(req);
 
     const [rows] = await pool.query("SELECT * FROM User WHERE email = ?", [email]);
     if (!rows.length) return res.status(400).json({ message: "Invalid email or password" });
@@ -95,8 +107,16 @@ export const login = async (req, res) => {
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) return res.status(400).json({ message: "Invalid email or password" });
 
+    if (portal === "admin" && !["admin", "staff"].includes(user.role)) {
+      return res.status(403).json({ message: "You do not have admin access" });
+    }
+
+    if (portal === "customer" && user.role !== "customer") {
+      return res.status(403).json({ message: "Please use a customer account in the user app." });
+    }
+
     // ✅ send token via cookie
-    sendToken(user, res, "Login successful");
+    sendToken(req, user, res, "Login successful");
   } catch (err) {
     console.error("Login error:", err);
     res.status(500).json({ message: "Login failed" });
@@ -110,11 +130,9 @@ export const login = async (req, res) => {
 
 export const logout = (req, res) => {
   try {
-    res.clearCookie("token", {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-    });
+    const cookieName = getCookieNameForPortal(getPortalFromRequest(req));
+
+    res.clearCookie(cookieName, AUTH_COOKIE_BASE_OPTIONS);
     res.json({ message: "Logged out successfully" });
   } catch (err) {
     console.error("Logout error:", err);
@@ -127,7 +145,7 @@ export const logout = (req, res) => {
 // ✅ VERIFY LOGIN STATUS (for cookie-based auth)
 export const verifyUser = async (req, res) => {
   try {
-    const token = req.cookies.token; // read from cookie
+    const token = getTokenFromRequest(req);
     if (!token) {
       return res.status(401).json({ valid: false, message: "No token found" });
     }

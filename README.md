@@ -89,6 +89,11 @@ JWT_EXPIRES_IN=7d
 NODE_ENV=development
 CORS_ORIGIN_CUSTOMER=http://localhost:5173
 CORS_ORIGIN_ADMIN=http://localhost:5174
+AUTH_COOKIE_MAX_AGE_MS=604800000
+AUTH_COOKIE_SAME_SITE=lax
+AUTH_COOKIE_SECURE=false
+AUTH_COOKIE_DOMAIN=
+AUTH_TRUST_PROXY=false
 RAZORPAY_KEY_ID=rzp_test_xxxxxxxxxx
 RAZORPAY_KEY_SECRET=xxxxxxxxxx
 RAZORPAY_WEBHOOK_SECRET=whsec_xxxxxxxxxx
@@ -176,6 +181,11 @@ Sample admin accounts from the dump include:
 - `NODE_ENV`: runtime mode
 - `CORS_ORIGIN_CUSTOMER`: allowed origin for the customer app
 - `CORS_ORIGIN_ADMIN`: allowed origin for the admin app
+- `AUTH_COOKIE_MAX_AGE_MS`: auth cookie lifetime in milliseconds
+- `AUTH_COOKIE_SAME_SITE`: cookie same-site policy, usually `lax` locally and `none` for cross-site HTTPS deployments
+- `AUTH_COOKIE_SECURE`: whether auth cookies require HTTPS
+- `AUTH_COOKIE_DOMAIN`: optional shared cookie domain for production
+- `AUTH_TRUST_PROXY`: enable when running the backend behind a reverse proxy or load balancer
 - `RAZORPAY_KEY_ID`: Razorpay public key used by the backend SDK
 - `RAZORPAY_KEY_SECRET`: Razorpay secret key used only on the backend
 - `PAYMENT_TIMEOUT_MINUTES`: how long an unpaid order stays active
@@ -205,7 +215,10 @@ npm run build:admin
 - Set `VITE_API_BASE_URL` in both frontends to the public backend URL.
 - Set backend CORS origins to the exact deployed frontend URLs.
 - Use a strong `JWT_SECRET` in production.
-- Use HTTPS in production if you want secure cookies enabled safely.
+- Use HTTPS in production.
+- For cross-site frontend/backend deployments, set `AUTH_COOKIE_SAME_SITE=none` and `AUTH_COOKIE_SECURE=true`.
+- If the backend runs behind Nginx, Render, Railway, Fly.io, or another proxy, set `AUTH_TRUST_PROXY=true`.
+- If you need cookies shared across subdomains, set `AUTH_COOKIE_DOMAIN` to your parent domain.
 
 ## Notes
 
