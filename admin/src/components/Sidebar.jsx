@@ -7,6 +7,7 @@ import {
   Package,
   MessageSquare,
   LogOut,
+  Settings,
 } from "lucide-react";
 import axios from "../api/axios.js";
 import Notice from "./Notice.jsx";
@@ -31,8 +32,9 @@ const Sidebar = () => {
     { name: "Dashboard", path: "/dashboard", icon: <LayoutDashboard size={20} /> },
     { name: "Menu", path: "/menu", icon: <Utensils size={20} /> },
     { name: "Orders", path: "/orders", icon: <ClipboardList size={20} /> },
-    { name: "Inventory", path: "/inventory", icon: <Package size={20} /> },
+    { name: "Availability", path: "/inventory", icon: <Package size={20} /> },
     { name: "Feedback", path: "/feedback", icon: <MessageSquare size={20} /> }, // ✅ Added feedback
+    { name: "Settings", path: "/settings", icon: <Settings size={20} /> },
   ];
 
   return (

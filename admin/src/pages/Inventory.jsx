@@ -7,53 +7,46 @@ import Notice from "../components/Notice.jsx";
 const Inventory = () => {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [drafts, setDrafts] = useState({});
   const [notice, setNotice] = useState({ message: "", tone: "info" });
   const [search, setSearch] = useState("");
-  const [showLowStockOnly, setShowLowStockOnly] = useState(false);
 
   useEffect(() => {
-    fetchInventory();
+    fetchMenu();
   }, []);
 
-  const fetchInventory = async () => {
+  const fetchMenu = async () => {
     try {
       setLoading(true);
-      const res = await axios.get("/inventory");
+      const res = await axios.get("/menu");
       setItems(res.data || []);
-      setDrafts(
-        Object.fromEntries((res.data || []).map((item) => [item.item_id, item.stock_quantity]))
-      );
       setNotice({ message: "", tone: "info" });
     } catch (err) {
-      console.error("Inventory fetch error:", err);
-      setNotice({ message: "Failed to fetch inventory.", tone: "error" });
+      console.error("Availability fetch error:", err);
+      setNotice({ message: "Failed to fetch menu availability.", tone: "error" });
     } finally {
       setLoading(false);
     }
   };
 
-  const updateStock = async (itemId) => {
+  const toggleAvailability = async (itemId, currentValue) => {
     try {
-      await axios.patch(`/inventory/${itemId}`, {
-        stock_quantity: Number(drafts[itemId]),
+      await axios.patch(`/menu/${itemId}/availability`, {
+        availability: !currentValue,
       });
-      setNotice({ message: "Inventory updated successfully.", tone: "success" });
-      fetchInventory();
-    } catch (err) {
-      console.error("Stock update error:", err);
       setNotice({
-        message: err.response?.data?.message || "Failed to update stock.",
-        tone: "error",
+        message: `Item ${currentValue ? "marked unavailable" : "made available"}.`,
+        tone: "success",
       });
+      fetchMenu();
+    } catch (err) {
+      console.error("Toggle availability error:", err);
+      setNotice({ message: "Failed to update availability.", tone: "error" });
     }
   };
 
-  const filteredItems = items.filter((item) => {
-    const searchMatch = item.name.toLowerCase().includes(search.toLowerCase());
-    const stockMatch = !showLowStockOnly || Number(item.stock_quantity) <= 10;
-    return searchMatch && stockMatch;
-  });
+  const filteredItems = items.filter((item) =>
+    item.name.toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
     <div className="flex min-h-screen bg-slate-100">
@@ -66,9 +59,9 @@ const Inventory = () => {
           <Notice message={notice.message} tone={notice.tone} />
 
           <section className="rounded-3xl bg-white p-6 shadow-sm">
-            <h2 className="text-3xl font-bold text-slate-900">Inventory and availability</h2>
+            <h2 className="text-3xl font-bold text-slate-900">Availability control</h2>
             <p className="mt-2 text-sm text-slate-500">
-              Track stock levels, spot low inventory, and keep the live menu accurate.
+              Turn menu items on or off so customers only see what can be ordered right now.
             </p>
           </section>
 
@@ -80,17 +73,6 @@ const Inventory = () => {
               placeholder="Search item..."
               className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-orange-400 focus:bg-white lg:w-80"
             />
-
-            <button
-              onClick={() => setShowLowStockOnly((current) => !current)}
-              className={`rounded-full px-4 py-2 text-sm font-medium transition ${
-                showLowStockOnly
-                  ? "bg-rose-500 text-white"
-                  : "bg-slate-100 text-slate-600 hover:bg-rose-50 hover:text-rose-600"
-              }`}
-            >
-              {showLowStockOnly ? "Showing low stock only" : "Filter low stock"}
-            </button>
           </section>
 
           {loading ? (
@@ -106,74 +88,40 @@ const Inventory = () => {
                     <th className="px-4 py-3 font-medium">Category</th>
                     <th className="px-4 py-3 font-medium">Price</th>
                     <th className="px-4 py-3 font-medium">Availability</th>
-                    <th className="px-4 py-3 font-medium">Stock</th>
-                    <th className="px-4 py-3 font-medium">Last Updated</th>
                     <th className="px-4 py-3 font-medium">Action</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredItems.map((item) => {
-                    const isLowStock = Number(item.stock_quantity) <= 10;
-
-                    return (
-                      <tr key={item.item_id} className="border-b border-slate-100 text-slate-700">
-                        <td className="px-4 py-4 font-medium text-slate-900">{item.name}</td>
-                        <td className="px-4 py-4">{item.category}</td>
-                        <td className="px-4 py-4">₹{item.cost}</td>
-                        <td className="px-4 py-4">
-                          <span
-                            className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                              item.availability
-                                ? "bg-emerald-100 text-emerald-700"
-                                : "bg-rose-100 text-rose-700"
-                            }`}
-                          >
-                            {item.availability ? "Available" : "Unavailable"}
-                          </span>
-                        </td>
-                        <td className="px-4 py-4">
-                          <div className="flex items-center gap-3">
-                            <input
-                              type="number"
-                              min="0"
-                              value={drafts[item.item_id] ?? item.stock_quantity}
-                              onChange={(event) =>
-                                setDrafts((current) => ({
-                                  ...current,
-                                  [item.item_id]: event.target.value,
-                                }))
-                              }
-                              className={`w-24 rounded-2xl border px-3 py-2 outline-none ${
-                                isLowStock
-                                  ? "border-rose-200 bg-rose-50 text-rose-700"
-                                  : "border-slate-200 bg-slate-50"
-                              }`}
-                            />
-                            {isLowStock && (
-                              <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-700">
-                                Low
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-4 text-slate-500">
-                          {new Date(item.last_updated).toLocaleString()}
-                        </td>
-                        <td className="px-4 py-4">
-                          <button
-                            onClick={() => updateStock(item.item_id)}
-                            className="rounded-full bg-orange-500 px-4 py-2 font-semibold text-white transition hover:bg-orange-600"
-                          >
-                            Save
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                  {filteredItems.map((item) => (
+                    <tr key={item.item_id} className="border-b border-slate-100 text-slate-700">
+                      <td className="px-4 py-4 font-medium text-slate-900">{item.name}</td>
+                      <td className="px-4 py-4">{item.category}</td>
+                      <td className="px-4 py-4">₹{item.cost}</td>
+                      <td className="px-4 py-4">
+                        <span
+                          className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                            item.availability
+                              ? "bg-emerald-100 text-emerald-700"
+                              : "bg-rose-100 text-rose-700"
+                          }`}
+                        >
+                          {item.availability ? "Available" : "Unavailable"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4">
+                        <button
+                          onClick={() => toggleAvailability(item.item_id, item.availability)}
+                          className="rounded-full bg-orange-500 px-4 py-2 font-semibold text-white transition hover:bg-orange-600"
+                        >
+                          {item.availability ? "Mark unavailable" : "Make available"}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
                   {filteredItems.length === 0 && (
                     <tr>
-                      <td colSpan="7" className="px-4 py-6 text-center text-slate-500">
-                        No inventory items match the current filters.
+                      <td colSpan="5" className="px-4 py-6 text-center text-slate-500">
+                        No menu items match the current search.
                       </td>
                     </tr>
                   )}

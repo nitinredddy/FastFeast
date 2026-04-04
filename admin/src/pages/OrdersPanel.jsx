@@ -6,6 +6,19 @@ import Sidebar from "../components/Sidebar";
 import Notice from "../components/Notice.jsx";
 
 const STATUS_OPTIONS = ["pending", "preparing", "ready", "completed", "cancelled"];
+const PAYMENT_META = {
+  pending: "bg-amber-100 text-amber-700",
+  paid: "bg-emerald-100 text-emerald-700",
+  failed: "bg-rose-100 text-rose-700",
+  cancelled: "bg-slate-100 text-slate-700",
+  refunded: "bg-sky-100 text-sky-700",
+};
+const REFUND_META = {
+  none: "bg-slate-100 text-slate-500",
+  pending: "bg-sky-100 text-sky-700",
+  processed: "bg-emerald-100 text-emerald-700",
+  failed: "bg-rose-100 text-rose-700",
+};
 
 const OrdersPanel = () => {
   const [orders, setOrders] = useState([]);
@@ -18,6 +31,7 @@ const OrdersPanel = () => {
   const [statusFilter, setStatusFilter] = useState("active");
   const [notice, setNotice] = useState({ message: "", tone: "info" });
   const [search, setSearch] = useState("");
+  const [refundLoading, setRefundLoading] = useState(false);
 
   useEffect(() => {
     fetchOrders(date);
@@ -72,6 +86,31 @@ const OrdersPanel = () => {
       setDetailsError(err.response?.data?.message || "Failed to load order details.");
     } finally {
       setDetailsLoading(false);
+    }
+  };
+
+  const handleRetryRefund = async (orderId) => {
+    try {
+      setRefundLoading(true);
+      const res = await axios.post(`/api/payment/refund/${orderId}`, {
+        reason: "Manual refund retry from admin panel",
+      });
+      setNotice({ message: res.data.message || "Refund processed.", tone: "success" });
+      await fetchOrders(date);
+      const currentOrderId = selectedOrder?.order?.order_id || orderId;
+      const orderForRefresh =
+        orders.find((order) => order.order_id === currentOrderId) || selectedOrder?.order;
+      if (orderForRefresh) {
+        await handleViewOrder(orderForRefresh);
+      }
+    } catch (err) {
+      console.error("Refund retry error:", err);
+      setNotice({
+        message: err.response?.data?.message || "Failed to process refund.",
+        tone: "error",
+      });
+    } finally {
+      setRefundLoading(false);
     }
   };
 
@@ -215,7 +254,27 @@ const OrdersPanel = () => {
                           {order.status}
                         </span>
                       </td>
-                      <td className="px-4 py-4">{order.payment_mode}</td>
+                      <td className="px-4 py-4">
+                        <div className="flex flex-col gap-1">
+                          <span>{order.payment_mode}</span>
+                          <span
+                            className={`w-fit rounded-full px-2 py-1 text-xs font-semibold ${
+                              PAYMENT_META[order.payment_status || "paid"] || PAYMENT_META.paid
+                            }`}
+                          >
+                            {(order.payment_status || "paid").toUpperCase()}
+                          </span>
+                          {(order.refund_status || "none") !== "none" && (
+                            <span
+                              className={`w-fit rounded-full px-2 py-1 text-xs font-semibold ${
+                                REFUND_META[order.refund_status || "none"] || REFUND_META.none
+                              }`}
+                            >
+                              REFUND {(order.refund_status || "none").toUpperCase()}
+                            </span>
+                          )}
+                        </div>
+                      </td>
                       <td className="px-4 py-4 text-slate-500">
                         {new Date(order.order_date).toLocaleString()}
                       </td>
@@ -282,6 +341,8 @@ const OrdersPanel = () => {
                   <DetailCard label="Email" value={selectedOrder.order.customer_email} />
                   <DetailCard label="Phone" value={selectedOrder.order.customer_phone} />
                   <DetailCard label="Payment" value={selectedOrder.order.payment_mode} />
+                  <DetailCard label="Payment state" value={selectedOrder.order.payment_status || "paid"} />
+                  <DetailCard label="Refund state" value={selectedOrder.order.refund_status || "none"} />
                   <DetailCard label="Status" value={selectedOrder.order.status} />
                   <DetailCard
                     label="Pickup time"
@@ -295,6 +356,48 @@ const OrdersPanel = () => {
                     {selectedOrder.order.customer_address || "No address provided"}
                   </p>
                 </div>
+
+                {((selectedOrder.order.status === "cancelled" &&
+                  selectedOrder.order.payment_status === "paid" &&
+                  selectedOrder.order.payment_mode === "Razorpay") ||
+                (selectedOrder.order.refund_status || "none") !== "none" ? (
+                  <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                      Refund
+                    </p>
+                    <div className="mt-3 flex flex-wrap items-center gap-3">
+                      <span
+                        className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                          REFUND_META[selectedOrder.order.refund_status || "none"] || REFUND_META.none
+                        }`}
+                      >
+                        {(selectedOrder.order.refund_status || "none").toUpperCase()}
+                      </span>
+                      {selectedOrder.order.refund_id && (
+                        <span className="text-sm text-slate-600">
+                          Refund ID: {selectedOrder.order.refund_id}
+                        </span>
+                      )}
+                    </div>
+                    {selectedOrder.order.refund_failure_reason && (
+                      <p className="mt-3 text-sm text-rose-700">
+                        {selectedOrder.order.refund_failure_reason}
+                      </p>
+                    )}
+                    {selectedOrder.order.status === "cancelled" &&
+                      selectedOrder.order.payment_status === "paid" &&
+                      selectedOrder.order.payment_mode === "Razorpay" &&
+                      selectedOrder.order.refund_status !== "processed" && (
+                        <button
+                          onClick={() => handleRetryRefund(selectedOrder.order.order_id)}
+                          disabled={refundLoading}
+                          className="mt-4 rounded-2xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+                        >
+                          {refundLoading ? "Processing refund..." : "Retry refund"}
+                        </button>
+                      )}
+                  </div>
+                ) : null)}
 
                 <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-5">
                   <h4 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">

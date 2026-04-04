@@ -32,6 +32,21 @@ const STATUS_META = {
   },
 };
 
+const PAYMENT_META = {
+  pending: { label: "Payment pending", chip: "bg-amber-100 text-amber-700" },
+  paid: { label: "Paid", chip: "bg-emerald-100 text-emerald-700" },
+  failed: { label: "Payment failed", chip: "bg-rose-100 text-rose-700" },
+  cancelled: { label: "Payment cancelled", chip: "bg-slate-200 text-slate-700" },
+  refunded: { label: "Refunded", chip: "bg-sky-100 text-sky-700" },
+};
+
+const REFUND_META = {
+  none: null,
+  pending: { label: "Refund pending", chip: "bg-sky-100 text-sky-700" },
+  processed: { label: "Refund processed", chip: "bg-emerald-100 text-emerald-700" },
+  failed: { label: "Refund issue", chip: "bg-rose-100 text-rose-700" },
+};
+
 const Orders = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -127,6 +142,8 @@ const Orders = () => {
           <div className="mt-8 grid gap-5 lg:grid-cols-2">
             {filteredOrders.map((order) => {
               const meta = STATUS_META[order.status] || STATUS_META.pending;
+              const payment = PAYMENT_META[order.payment_status || "paid"] || PAYMENT_META.paid;
+              const refund = REFUND_META[order.refund_status || "none"];
               const totalUnits =
                 order.items?.reduce((sum, item) => sum + Number(item.quantity || 0), 0) || 0;
 
@@ -155,9 +172,36 @@ const Orders = () => {
                     <StatusInfo icon={<PackageCheck size={16} />} label="Payment" value={order.payment_mode} />
                   </div>
 
+                  <div className="mt-4">
+                    <div className="flex flex-wrap gap-2">
+                      <span className={`rounded-full px-3 py-1 text-xs font-semibold ${payment.chip}`}>
+                        {payment.label}
+                      </span>
+                      {refund && (
+                        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${refund.chip}`}>
+                          {refund.label}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
                   <p className="mt-5 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                    {meta.message}
+                    {order.refund_status === "processed"
+                      ? "Your payment was settled back to the original method after cancellation."
+                      : order.refund_status === "pending"
+                      ? "Your order is cancelled and the refund is being processed."
+                      : order.refund_status === "failed"
+                      ? "The team needs to retry the refund for this cancelled order."
+                      : order.payment_status && !["paid", "refunded"].includes(order.payment_status)
+                      ? "This order is waiting on payment completion or needs a retry."
+                      : meta.message}
                   </p>
+
+                  {order.refund_failure_reason && order.refund_status === "failed" && (
+                    <div className="mt-3 rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                      {order.refund_failure_reason}
+                    </div>
+                  )}
 
                   <div className="mt-5 rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
                     <h4 className="text-sm font-semibold text-slate-800">Ordered items</h4>

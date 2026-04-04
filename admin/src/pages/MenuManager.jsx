@@ -5,7 +5,7 @@ import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
 import Notice from "../components/Notice.jsx";
 
-const emptyForm = { name: "", cost: "", category: "", stock_quantity: 0 };
+const emptyForm = { name: "", cost: "", category: "" };
 
 const MenuManager = () => {
   const [menu, setMenu] = useState([]);
@@ -41,10 +41,7 @@ const MenuManager = () => {
       if (editId) {
         await axios.put(`/menu/${editId}`, form);
       } else {
-        await axios.post("/menu", {
-          ...form,
-          stock_quantity: Number(form.stock_quantity),
-        });
+        await axios.post("/menu", form);
       }
 
       setForm(emptyForm);
@@ -120,7 +117,7 @@ const MenuManager = () => {
                 {editId ? "Edit menu item" : "Add a new menu item"}
               </h2>
               <p className="mt-2 text-sm text-slate-500">
-                Keep the customer app up to date with accurate categories, pricing, and launch stock.
+                Keep the customer app up to date with accurate categories, pricing, and availability.
               </p>
 
               <form onSubmit={handleSubmit} className="mt-6 space-y-4">
@@ -159,17 +156,6 @@ const MenuManager = () => {
                     <option value="Desserts">Desserts</option>
                   </select>
                 </div>
-
-                {!editId && (
-                  <input
-                    type="number"
-                    min="0"
-                    placeholder="Initial stock quantity"
-                    value={form.stock_quantity}
-                    onChange={(event) => setForm({ ...form, stock_quantity: event.target.value })}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-orange-400 focus:bg-white"
-                  />
-                )}
 
                 <div className="flex gap-3">
                   <button
@@ -282,7 +268,6 @@ const MenuManager = () => {
                                   name: item.name,
                                   cost: item.cost,
                                   category: item.category,
-                                  stock_quantity: 0,
                                 });
                               }}
                               className="rounded-full bg-slate-100 p-2 text-blue-600 transition hover:bg-slate-200"

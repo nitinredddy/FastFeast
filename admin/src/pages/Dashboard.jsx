@@ -8,7 +8,6 @@ const Dashboard = () => {
     total_orders: 0,
     today_orders: 0,
     active_menu: 0,
-    low_stock: 0,
     total_revenue: 0,
   });
   const [recentOrders, setRecentOrders] = useState([]);
@@ -46,7 +45,7 @@ const Dashboard = () => {
     { title: "Total Orders", value: stats.total_orders, tone: "bg-slate-900 text-white" },
     { title: "Orders Today", value: stats.today_orders, tone: "bg-orange-500 text-white" },
     { title: "Active Menu Items", value: stats.active_menu, tone: "bg-white text-slate-900" },
-    { title: "Low Stock Alerts", value: stats.low_stock, tone: "bg-rose-50 text-rose-700" },
+    { title: "Completed Revenue", value: `₹${Number(stats.total_revenue || 0).toFixed(0)}`, tone: "bg-white text-slate-900" },
   ];
 
   return (

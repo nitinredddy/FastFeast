@@ -39,6 +39,10 @@ export const register = async (req, res) => {
     const { name, email, password, phone } = req.body;
     const role = "customer";
 
+    if (!name || !email || !password) {
+      return res.status(400).json({ message: "Name, email, and password are required" });
+    }
+
     // check if user already exists
     const [exists] = await pool.query("SELECT * FROM User WHERE email = ?", [email]);
     if (exists.length) return res.status(400).json({ message: "User already exists" });
@@ -53,14 +57,25 @@ export const register = async (req, res) => {
     );
 
     // fetch new user
-    const [rows] = await pool.query("SELECT * FROM User WHERE user_id = ?", [result.insertId]);
+    const [rows] = await pool.query(
+      "SELECT user_id, name, email, role FROM User WHERE user_id = ?",
+      [result.insertId]
+    );
     const newUser = rows[0];
 
     // ✅ auto-login after register
     sendToken(newUser, res, "Registered and logged in successfully");
   } catch (err) {
     console.error("Registration error:", err);
-    res.status(500).json({ message: "Registration failed" });
+    if (err.code === "ER_BAD_NULL_ERROR") {
+      return res.status(400).json({ message: "Some required user fields are missing in the database setup" });
+    }
+
+    if (err.code === "ER_NO_DEFAULT_FOR_FIELD") {
+      return res.status(400).json({ message: `Database requires an extra field: ${err.sqlMessage}` });
+    }
+
+    res.status(500).json({ message: err.sqlMessage || "Registration failed" });
   }
 };
 

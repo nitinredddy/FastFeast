@@ -48,11 +48,6 @@ const Home = () => {
     const existingCart = getCart();
     const existingItem = existingCart.find((cartItem) => cartItem.item_id === item.item_id);
 
-    if (existingItem && existingItem.quantity >= Number(item.stock_quantity || 0)) {
-      toast.error(`Only ${item.stock_quantity} serving(s) left for ${item.name}.`);
-      return;
-    }
-
     const updatedCart = existingItem
       ? existingCart.map((cartItem) =>
           cartItem.item_id === item.item_id

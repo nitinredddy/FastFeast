@@ -6,7 +6,10 @@ FastFeast is a food pre-order platform with three apps in one workspace:
 - `admin/`: admin and staff React app
 - `backend/`: Express API with MySQL
 
-Customers can place orders before reaching the counter. Admin and staff users can manage menu items, inventory, feedback, and order flow from a separate dashboard.
+Customers can place orders before reaching the counter. Admin and staff users can manage menu items, availability, feedback, and order flow from a separate dashboard.
+Payments are handled through Razorpay with backend signature verification.
+Paid cancellations now move through a dedicated `Payments` ledger and can trigger Razorpay refunds.
+Admin users can control ordering/payment availability and operating hours from the settings page.
 
 ## Tech Stack
 
@@ -82,6 +85,7 @@ CORS_ORIGIN_ADMIN=http://localhost:5174
 
 ```env
 VITE_API_BASE_URL=http://localhost:3000
+VITE_RAZORPAY_KEY_ID=rzp_test_xxxxxxxxxx
 ```
 
 `admin/.env.example`
@@ -147,10 +151,18 @@ After importing `docs/fastfeast.sql`, the seeded admin account is:
 - `NODE_ENV`: runtime mode
 - `CORS_ORIGIN_CUSTOMER`: allowed origin for the customer app
 - `CORS_ORIGIN_ADMIN`: allowed origin for the admin app
+- `RAZORPAY_KEY_ID`: Razorpay public key used by the backend SDK
+- `RAZORPAY_KEY_SECRET`: Razorpay secret key used only on the backend
+- `PAYMENT_TIMEOUT_MINUTES`: how long an unpaid order stays active
+- `CANTEEN_OPEN`: global on/off switch for ordering
+- `CANTEEN_OPEN_HOUR_START`: opening hour in 24h format
+- `CANTEEN_OPEN_HOUR_END`: closing hour in 24h format
+- `RAZORPAY_WEBHOOK_SECRET`: secret used to verify Razorpay webhook events
 
 ### Frontends
 
 - `VITE_API_BASE_URL`: backend base URL used by both `user` and `admin`
+- `VITE_RAZORPAY_KEY_ID`: Razorpay key used to open checkout in the user app
 
 ## Build
 
@@ -175,3 +187,4 @@ npm run build:admin
 - Environment files are per app. There is no root `.env`.
 - The backend uses npm workspace scripts from the repository root.
 - SQL and project documentation live in `docs/`.
+- The consolidated schema in [docs/fastfeast.sql](/Users/nitinreddy/Desktop/fastfeast/docs/fastfeast.sql) now includes the payments ledger and refund support.

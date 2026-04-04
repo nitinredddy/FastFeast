@@ -23,14 +23,87 @@ CREATE TABLE Menu (
 CREATE TABLE Orders (
     order_id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT,
+    canteen_id INT DEFAULT 1,
     order_no INT,
     amount DECIMAL(10,2),
     payment_mode VARCHAR(50),
     order_date DATETIME DEFAULT CURRENT_TIMESTAMP,
     pickup_time TIME,
     status ENUM('pending', 'preparing', 'ready', 'completed', 'cancelled') DEFAULT 'pending',
+    payment_status ENUM('pending', 'paid', 'failed', 'cancelled') DEFAULT 'pending',
+    razorpay_order_id VARCHAR(255) UNIQUE NULL,
+    razorpay_payment_id VARCHAR(255) UNIQUE NULL,
+    razorpay_signature VARCHAR(255) NULL,
+    payment_expires_at DATETIME NULL,
+    payment_verified_at DATETIME NULL,
+    payment_failure_reason VARCHAR(255) NULL,
     FOREIGN KEY (user_id) REFERENCES User(user_id)
 );
+
+CREATE TABLE Payments (
+    payment_id INT AUTO_INCREMENT PRIMARY KEY,
+    order_id INT NOT NULL UNIQUE,
+    user_id INT NOT NULL,
+    provider VARCHAR(50) NOT NULL DEFAULT 'razorpay',
+    provider_order_id VARCHAR(255) UNIQUE NULL,
+    provider_payment_id VARCHAR(255) UNIQUE NULL,
+    provider_signature VARCHAR(255) NULL,
+    amount DECIMAL(10,2) NOT NULL,
+    currency VARCHAR(10) NOT NULL DEFAULT 'INR',
+    status ENUM('pending', 'paid', 'failed', 'cancelled', 'refunded') DEFAULT 'pending',
+    refund_status ENUM('none', 'pending', 'processed', 'failed') DEFAULT 'none',
+    refund_id VARCHAR(255) NULL,
+    refund_amount DECIMAL(10,2) NULL,
+    failure_reason VARCHAR(255) NULL,
+    refund_failure_reason VARCHAR(255) NULL,
+    expires_at DATETIME NULL,
+    verified_at DATETIME NULL,
+    refunded_at DATETIME NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (order_id) REFERENCES Orders(order_id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES User(user_id)
+);
+
+INSERT INTO Payments (
+    order_id,
+    user_id,
+    provider,
+    provider_order_id,
+    provider_payment_id,
+    provider_signature,
+    amount,
+    currency,
+    status,
+    refund_status,
+    failure_reason,
+    expires_at,
+    verified_at
+)
+SELECT
+    o.order_id,
+    o.user_id,
+    CASE
+        WHEN o.payment_mode = 'Razorpay' THEN 'razorpay'
+        ELSE LOWER(COALESCE(o.payment_mode, 'manual'))
+    END AS provider,
+    o.razorpay_order_id,
+    o.razorpay_payment_id,
+    o.razorpay_signature,
+    COALESCE(o.amount, 0),
+    'INR',
+    CASE
+        WHEN o.status = 'cancelled' AND COALESCE(o.payment_status, 'pending') = 'paid' THEN 'paid'
+        WHEN o.status = 'cancelled' THEN 'cancelled'
+        ELSE COALESCE(o.payment_status, 'paid')
+    END AS status,
+    'none',
+    o.payment_failure_reason,
+    o.payment_expires_at,
+    o.payment_verified_at
+FROM Orders o
+LEFT JOIN Payments p ON p.order_id = o.order_id
+WHERE p.order_id IS NULL;
 
 CREATE TABLE OrderItem (
     order_id INT,
@@ -52,14 +125,6 @@ CREATE TABLE Feedback (
     FOREIGN KEY (item_id) REFERENCES Menu(item_id)
 );
 
-CREATE TABLE Inventory (
-    item_id INT PRIMARY KEY,
-    stock_quantity INT DEFAULT 0,
-    last_updated DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (item_id) REFERENCES Menu(item_id),
-    CHECK (stock_quantity >= 0)
-);
-
 CREATE TABLE OrderLogs (
     log_id INT AUTO_INCREMENT PRIMARY KEY,
     order_id INT,
@@ -67,6 +132,15 @@ CREATE TABLE OrderLogs (
     new_status VARCHAR(20),
     changed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (order_id) REFERENCES Orders(order_id)
+);
+
+CREATE TABLE BusinessSettings (
+    settings_id INT PRIMARY KEY,
+    ordering_enabled BOOLEAN DEFAULT TRUE,
+    payments_enabled BOOLEAN DEFAULT TRUE,
+    open_hour_start INT DEFAULT 8,
+    open_hour_end INT DEFAULT 22,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
 INSERT INTO User (name, email, password, phone, role)
@@ -77,6 +151,9 @@ VALUES (
     '9999999999',
     'admin'
 );
+
+INSERT INTO BusinessSettings (settings_id, ordering_enabled, payments_enabled, open_hour_start, open_hour_end)
+VALUES (1, TRUE, TRUE, 8, 22);
 
 DELIMITER //
 
@@ -114,8 +191,8 @@ BEGIN
     FROM Orders
     WHERE DATE(order_date) = today;
 
-    INSERT INTO Orders (user_id, amount, payment_mode, pickup_time, order_no, status)
-    VALUES (p_user_id, 0, p_payment_mode, p_pickup_time, p_order_no, 'pending');
+    INSERT INTO Orders (user_id, amount, payment_mode, pickup_time, order_no, status, payment_status, payment_verified_at)
+    VALUES (p_user_id, 0, p_payment_mode, p_pickup_time, p_order_no, 'preparing', 'paid', NOW());
 
     SET p_order_id = LAST_INSERT_ID();
 
@@ -198,6 +275,7 @@ BEGIN
         o.amount,
         o.payment_mode,
         o.status,
+        o.payment_status,
         o.order_date,
         JSON_ARRAYAGG(
             JSON_OBJECT(
@@ -223,6 +301,7 @@ BEGIN
         u.name AS customer_name,
         o.amount,
         o.status,
+        o.payment_status,
         o.payment_mode,
         o.order_date
     FROM Orders o
@@ -232,24 +311,7 @@ BEGIN
 
     SELECT COALESCE(SUM(amount), 0) AS totalRevenue
     FROM Orders
-    WHERE DATE(order_date) = p_date AND status = 'completed';
-END //
-
-CREATE TRIGGER after_order_insert
-AFTER INSERT ON OrderItem
-FOR EACH ROW
-BEGIN
-    UPDATE Inventory
-    SET stock_quantity = GREATEST(0, stock_quantity - NEW.quantity)
-    WHERE item_id = NEW.item_id;
-END //
-
-CREATE TRIGGER after_menu_insert
-AFTER INSERT ON Menu
-FOR EACH ROW
-BEGIN
-    INSERT INTO Inventory (item_id, stock_quantity)
-    VALUES (NEW.item_id, 0);
+    WHERE DATE(order_date) = p_date AND payment_status = 'paid';
 END //
 
 CREATE TRIGGER after_order_status_update
@@ -282,7 +344,7 @@ BEGIN
         COALESCE(SUM(amount), 0) AS total_spent
     FROM Orders
     WHERE user_id = p_user_id
-      AND status = 'completed';
+      AND payment_status = 'paid';
 END //
 
 DELIMITER ;
@@ -293,7 +355,7 @@ SELECT
     COUNT(order_id) AS total_orders,
     SUM(amount) AS total_revenue
 FROM Orders
-WHERE status = 'completed'
+WHERE payment_status = 'paid'
 GROUP BY DATE(order_date)
 ORDER BY order_day DESC;
 
@@ -305,6 +367,7 @@ SELECT
     o.order_no,
     o.amount,
     o.status,
+    o.payment_status,
     o.payment_mode,
     o.order_date
 FROM Orders o

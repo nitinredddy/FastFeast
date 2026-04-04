@@ -7,12 +7,14 @@ import cors from "cors";
 import authRoutes from "./routes/authRoutes.js";
 import menuRoutes from "./routes/menuRoutes.js";
 import orderRoutes from "./routes/orderRoutes.js";
-import inventoryRoutes from "./routes/inventoryRoutes.js";
 import feedbackRoutes from "./routes/feedbackRoutes.js";
+import paymentRoutes from "./routes/paymentRoutes.js";
 import reportRoutes from "./routes/reportRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import adminOrderRoutes from "./routes/adminOrderRoutes.js";
 import pool from "./config/db.js";
+import { ensureOrderPaymentSchema } from "./lib/orderSchema.js";
+import { ensurePaymentSchema } from "./lib/paymentSchema.js";
 
 dotenv.config();
 const app = express();
@@ -21,13 +23,17 @@ app.use(cors({
     origin:[process.env.CORS_ORIGIN_CUSTOMER,process.env.CORS_ORIGIN_ADMIN],
     credentials:true
 }));
-app.use(express.json());
+app.use(express.json({
+  verify: (req, res, buf) => {
+    req.rawBody = buf;
+  },
+}));
 
 // Base routes
 app.use("/auth", authRoutes);
 app.use("/menu", menuRoutes);
 app.use("/orders", orderRoutes);
-app.use("/inventory", inventoryRoutes);
+app.use("/api/payment", paymentRoutes);
 app.use("/feedback", feedbackRoutes);
 app.use("/reports", reportRoutes);
 app.use("/admin", adminRoutes); // ✅ for dashboard stats
@@ -56,8 +62,16 @@ app.use((err, req, res, next) => {
 
 // ✅ Start server
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`🚀 FastFeast backend running on port ${PORT}`);
-  console.log(`🧑‍💻 Customer UI: ${process.env.CORS_ORIGIN_CUSTOMER}`);
-  console.log(`👨‍🍳 Admin UI: ${process.env.CORS_ORIGIN_ADMIN}`);
-});
+ensureOrderPaymentSchema()
+  .then(() => ensurePaymentSchema())
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`🚀 FastFeast backend running on port ${PORT}`);
+      console.log(`🧑‍💻 Customer UI: ${process.env.CORS_ORIGIN_CUSTOMER}`);
+      console.log(`👨‍🍳 Admin UI: ${process.env.CORS_ORIGIN_ADMIN}`);
+    });
+  })
+  .catch((err) => {
+    console.error("Failed to ensure order payment schema:", err);
+    process.exit(1);
+  });

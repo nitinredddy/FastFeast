@@ -8,6 +8,7 @@ import Login from "./pages/Login.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import Feedback from "./pages/Feedback.jsx";
 import AccessDenied from "./pages/AccessDenied.jsx";
+import Settings from "./pages/Settings.jsx";
 
 function App() {
   return (
@@ -54,6 +55,14 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={["admin", "staff"]}>
               <Feedback />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings"
+          element={
+            <ProtectedRoute allowedRoles={["admin", "staff"]}>
+              <Settings />
             </ProtectedRoute>
           }
         />

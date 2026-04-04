@@ -9,7 +9,7 @@ import { authenticateJWT, authorizeRoles } from "../middlewares/authMiddleware.j
 const router = express.Router();
 
 // Customer submits feedback
-router.post("/", authenticateJWT, authorizeRoles("customer"), addFeedback);
+router.post("/", authenticateJWT, addFeedback);
 
 // Admin/staff view all feedback
 router.get("/", authenticateJWT, authorizeRoles("admin", "staff"), getAllFeedback);

@@ -5,14 +5,15 @@ import CartItem from "../components/CartItem";
 import axios from "../api/axios";
 import toast from "react-hot-toast";
 import { clearCart, getCart, saveCart } from "../utils/cart";
+import { loadRazorpayScript } from "../utils/razorpay";
 
 const Cart = () => {
   const navigate = useNavigate();
   const [cart, setCart] = useState(getCart());
   const [pickupTime, setPickupTime] = useState("");
   const [loading, setLoading] = useState(false);
-  const [showUPIModal, setShowUPIModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [paymentError, setPaymentError] = useState("");
 
   useEffect(() => {
     saveCart(cart);
@@ -30,19 +31,9 @@ const Cart = () => {
 
   const handleIncrease = (id) => {
     setCart((current) =>
-      current.map((item) => {
-        if (item.item_id !== id) {
-          return item;
-        }
-
-        const nextQuantity = item.quantity + 1;
-        if (nextQuantity > Number(item.stock_quantity || 0)) {
-          toast.error(`Only ${item.stock_quantity} serving(s) left for ${item.name}.`);
-          return item;
-        }
-
-        return { ...item, quantity: nextQuantity };
-      })
+      current.map((item) =>
+        item.item_id === id ? { ...item, quantity: item.quantity + 1 } : item
+      )
     );
   };
 
@@ -62,45 +53,106 @@ const Cart = () => {
     setCart((current) => current.filter((item) => item.item_id !== id));
   };
 
-  const handleConfirmUPI = async () => {
-    setShowUPIModal(false);
-    setLoading(true);
-
-    try {
-      await axios.post("/orders", {
-        items: cart.map((item) => ({
-          item_id: item.item_id,
-          quantity: item.quantity,
-        })),
-        payment_mode: "UPI",
-        pickup_time: pickupTime || null,
-      });
-
-      toast.success("Order placed successfully");
-      setCart([]);
-      setPickupTime("");
-      clearCart();
-      setShowSuccessModal(true);
-
-      setTimeout(() => {
-        setShowSuccessModal(false);
-        navigate("/orders");
-      }, 1800);
-    } catch (err) {
-      console.error("Order failed:", err);
-      toast.error(err.response?.data?.message || "Failed to place order. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleOrder = () => {
+  const handleOrder = async () => {
     if (cart.length === 0) {
       toast.error("Your cart is empty.");
       return;
     }
 
-    setShowUPIModal(true);
+    setLoading(true);
+    setPaymentError("");
+
+    try {
+      const scriptLoaded = await loadRazorpayScript();
+      if (!scriptLoaded) {
+        throw new Error("Failed to load Razorpay checkout");
+      }
+
+      const createOrderRes = await axios.post("/api/payment/create-order", {
+        items: cart.map((item) => ({
+          item_id: item.item_id,
+          quantity: item.quantity,
+        })),
+        canteen_id: 1,
+        pickup_time: pickupTime || null,
+      });
+
+      const { razorpay } = createOrderRes.data;
+      const key = import.meta.env.VITE_RAZORPAY_KEY_ID || razorpay.key;
+      let paymentCompleted = false;
+
+      if (!key) {
+        throw new Error("Razorpay key is missing in the frontend environment");
+      }
+
+      const razorpayCheckout = new window.Razorpay({
+        key,
+        amount: razorpay.amount,
+        currency: razorpay.currency,
+        name: razorpay.name,
+        description: razorpay.description,
+        order_id: razorpay.order_id,
+        prefill: {},
+        theme: { color: "#f97316" },
+        modal: {
+          ondismiss: async () => {
+            if (paymentCompleted) {
+              return;
+            }
+            await axios.post("/api/payment/fail", {
+              razorpay_order_id: razorpay.order_id,
+              reason: "User closed the Razorpay checkout",
+            });
+            setPaymentError("Payment was cancelled before completion. You can retry.");
+            setLoading(false);
+          },
+        },
+        handler: async (response) => {
+          try {
+            paymentCompleted = true;
+            await axios.post("/api/payment/verify", response);
+            toast.success("Payment successful and order placed");
+            setCart([]);
+            setPickupTime("");
+            clearCart();
+            setShowSuccessModal(true);
+
+            setTimeout(() => {
+              setShowSuccessModal(false);
+              navigate("/orders");
+            }, 1800);
+          } catch (verifyError) {
+            console.error("Payment verification failed:", verifyError);
+            setPaymentError(
+              verifyError.response?.data?.message ||
+                "Payment succeeded but verification failed. Please contact support."
+            );
+          } finally {
+            setLoading(false);
+          }
+        },
+      });
+
+      razorpayCheckout.on("payment.failed", async (response) => {
+        paymentCompleted = false;
+        await axios.post("/api/payment/fail", {
+          razorpay_order_id: razorpay.order_id,
+          reason:
+            response.error?.description ||
+            response.error?.reason ||
+            "Razorpay payment failed",
+        });
+        setPaymentError(response.error?.description || "Payment failed. Please try again.");
+        setLoading(false);
+      });
+
+      razorpayCheckout.open();
+    } catch (err) {
+      console.error("Order failed:", err);
+      setPaymentError(err.response?.data?.message || err.message || "Failed to start payment.");
+      toast.error(err.response?.data?.message || err.message || "Failed to start payment.");
+      setLoading(false);
+    }
   };
 
   return (
@@ -160,9 +212,13 @@ const Cart = () => {
               <span className="font-semibold text-slate-900">₹{subtotal.toFixed(2)}</span>
             </div>
             <div className="rounded-2xl bg-orange-50 p-4 text-xs leading-6 text-orange-900">
-              Live stock checks happen at checkout, so you’ll get a clear message if an item sells
-              out before you confirm.
+              Availability is controlled by the admin team, so only active menu items can be ordered.
             </div>
+            {paymentError && (
+              <div className="rounded-2xl bg-rose-50 p-4 text-xs leading-6 text-rose-700">
+                {paymentError}
+              </div>
+            )}
           </div>
 
           <label className="mt-6 block">
@@ -180,7 +236,7 @@ const Cart = () => {
           <div className="mt-6 rounded-2xl bg-slate-950 p-4 text-white">
             <p className="text-xs uppercase tracking-[0.3em] text-orange-300">Pay at checkout</p>
             <p className="mt-2 text-3xl font-bold">₹{subtotal.toFixed(2)}</p>
-            <p className="mt-2 text-sm text-slate-300">Fast UPI flow with order tracking after payment.</p>
+            <p className="mt-2 text-sm text-slate-300">Secure Razorpay checkout with backend verification.</p>
           </div>
 
           <button
@@ -192,44 +248,10 @@ const Cart = () => {
                 : "bg-orange-500 text-white hover:bg-orange-600"
             }`}
           >
-      {loading ? "Placing order..." : "Confirm preorder"}
+            {loading ? "Starting payment..." : paymentError ? "Retry payment" : "Pay with Razorpay"}
           </button>
         </aside>
       </div>
-
-      {showUPIModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4">
-          <div className="w-full max-w-md rounded-3xl bg-white p-8 text-center shadow-2xl">
-            <h3 className="text-2xl font-bold text-slate-900">UPI payment</h3>
-            <p className="mt-2 text-sm text-slate-500">
-              Scan the QR below to simulate payment and confirm your preorder.
-            </p>
-
-            <div className="mt-6 flex justify-center">
-              <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?data=upi://pay?pa=fastfeast@upi&am=${subtotal.toFixed(2)}&cu=INR&size=180x180`}
-                alt="UPI QR"
-                className="rounded-2xl border border-slate-200 p-3 shadow-sm"
-              />
-            </div>
-
-            <div className="mt-6 grid gap-3 sm:grid-cols-2">
-              <button
-                onClick={() => setShowUPIModal(false)}
-                className="rounded-2xl bg-slate-100 px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-200"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleConfirmUPI}
-                className="rounded-2xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-orange-600"
-              >
-                Payment successful
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {showSuccessModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 px-4">

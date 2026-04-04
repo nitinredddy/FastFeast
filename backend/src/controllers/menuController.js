@@ -6,24 +6,20 @@ export const getMenu = async (req, res) => {
   try {
     const { category, availableOnly } = req.query;
 
-    let query = `SELECT 
-      m.*,
-      COALESCE(i.stock_quantity, 0) AS stock_quantity
-    FROM Menu m
-    LEFT JOIN Inventory i ON i.item_id = m.item_id`;
+    let query = "SELECT * FROM Menu";
     const params = [];
 
     if (category && availableOnly) {
-      query += " WHERE m.category = ? AND m.availability = TRUE";
+      query += " WHERE category = ? AND availability = TRUE";
       params.push(category);
     } else if (category) {
-      query += " WHERE m.category = ?";
+      query += " WHERE category = ?";
       params.push(category);
     } else if (availableOnly) {
-      query += " WHERE m.availability = TRUE";
+      query += " WHERE availability = TRUE";
     }
 
-    query += " ORDER BY m.category, m.name";
+    query += " ORDER BY category, name";
 
     const [rows] = await pool.query(query, params);
     res.json(rows);
@@ -36,7 +32,7 @@ export const getMenu = async (req, res) => {
 // ➕ Add a new menu item (admin only)
 export const addMenuItem = async (req, res) => {
   try {
-    const { name, cost, category, availability = true, stock_quantity = 0 } = req.body;
+    const { name, cost, category, availability = true } = req.body;
 
     if (!name || !cost || !category) {
       return res.status(400).json({ message: "Name, price, and category are required" });
@@ -45,11 +41,6 @@ export const addMenuItem = async (req, res) => {
     const [result] = await pool.query(
       "INSERT INTO Menu (name, cost, category, availability) VALUES (?, ?, ?, ?)",
       [name, cost, category, availability]
-    );
-
-    await pool.query(
-      "INSERT IGNORE INTO Inventory (item_id, stock_quantity) VALUES (?, ?)",
-      [result.insertId, stock_quantity]
     );
 
     res.status(201).json({ message: "Item added successfully", id: result.insertId });
@@ -134,7 +125,6 @@ export const deleteMenuItem = async (req, res) => {
       });
     }
 
-    await pool.query("DELETE FROM Inventory WHERE item_id = ?", [id]);
     await pool.query("DELETE FROM Menu WHERE item_id = ?", [id]);
     res.json({ message: "Item deleted successfully", archived: false });
   } catch (err) {
