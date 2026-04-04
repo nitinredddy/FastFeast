@@ -3,6 +3,7 @@ import { CheckCircle, Clock3, Loader2, PackageCheck, Soup, XCircle } from "lucid
 import Navbar from "../components/Navbar";
 import axios from "../api/axios";
 import toast from "react-hot-toast";
+import { normalizeOrders } from "../utils/orders";
 
 const STATUS_META = {
   pending: {
@@ -79,6 +80,11 @@ const Orders = () => {
     return orders.filter((order) => order.status === filter);
   }, [filter, orders]);
 
+  const normalizedOrders = useMemo(
+    () => normalizeOrders(filteredOrders),
+    [filteredOrders]
+  );
+
   const handleCancel = async (orderId) => {
     if (!window.confirm("Cancel this order?")) return;
 
@@ -131,7 +137,7 @@ const Orders = () => {
           <div className="flex justify-center py-12">
             <Loader2 className="animate-spin text-orange-500" size={32} />
           </div>
-        ) : filteredOrders.length === 0 ? (
+        ) : normalizedOrders.length === 0 ? (
           <div className="mt-8 rounded-3xl border border-dashed border-orange-200 bg-white p-10 text-center shadow-sm">
             <h3 className="text-xl font-semibold text-slate-900">No orders yet</h3>
             <p className="mt-2 text-sm text-slate-500">
@@ -140,12 +146,16 @@ const Orders = () => {
           </div>
         ) : (
           <div className="mt-8 grid gap-5 lg:grid-cols-2">
-            {filteredOrders.map((order) => {
+            {normalizedOrders.map((order) => {
               const meta = STATUS_META[order.status] || STATUS_META.pending;
               const payment = PAYMENT_META[order.payment_status || "paid"] || PAYMENT_META.paid;
               const refund = REFUND_META[order.refund_status || "none"];
-              const totalUnits =
-                order.items?.reduce((sum, item) => sum + Number(item.quantity || 0), 0) || 0;
+              const totalUnits = order.items.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+              const amount = Number(order.amount || 0);
+              const placedAt = order.order_date
+                ? new Date(order.order_date).toLocaleString()
+                : "Unknown";
+              const paymentMode = order.payment_mode || "Not specified";
 
               return (
                 <article
@@ -158,7 +168,7 @@ const Orders = () => {
                         Order #{order.order_no}
                       </p>
                       <h3 className="mt-2 text-lg font-semibold text-slate-900">
-                        ₹{Number(order.amount).toFixed(2)}
+                        ₹{amount.toFixed(2)}
                       </h3>
                     </div>
                     <span className={`rounded-full px-3 py-1 text-xs font-semibold ${meta.chip}`}>
@@ -167,9 +177,9 @@ const Orders = () => {
                   </div>
 
                   <div className="mt-5 grid gap-3 sm:grid-cols-3">
-                    <StatusInfo icon={<Clock3 size={16} />} label="Placed" value={new Date(order.order_date).toLocaleString()} />
+                    <StatusInfo icon={<Clock3 size={16} />} label="Placed" value={placedAt} />
                     <StatusInfo icon={<Soup size={16} />} label="Items" value={`${totalUnits} total`} />
-                    <StatusInfo icon={<PackageCheck size={16} />} label="Payment" value={order.payment_mode} />
+                    <StatusInfo icon={<PackageCheck size={16} />} label="Payment" value={paymentMode} />
                   </div>
 
                   <div className="mt-4">
@@ -206,7 +216,7 @@ const Orders = () => {
                   <div className="mt-5 rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
                     <h4 className="text-sm font-semibold text-slate-800">Ordered items</h4>
                     <ul className="mt-3 space-y-2 text-sm text-slate-600">
-                      {order.items?.map((item) => (
+                      {order.items.map((item) => (
                         <li key={`${order.order_id}-${item.item_id}`} className="flex justify-between gap-4">
                           <span>{item.name}</span>
                           <span className="font-medium text-slate-900">x{item.quantity}</span>

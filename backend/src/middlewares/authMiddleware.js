@@ -1,20 +1,11 @@
 // middleware/authMiddleware.js
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
+import { getTokenFromRequest } from "../utils/authCookies.js";
 dotenv.config();
 
-const getPreferredCookieName = (req) => {
-  const client = String(req.headers["x-app-client"] || "").toLowerCase();
-  return client === "admin" ? "admin_token" : "customer_token";
-};
-
 export const authenticateJWT = (req, res, next) => {
-  const preferredCookieName = getPreferredCookieName(req);
-  const token =
-    req.cookies?.[preferredCookieName] ||
-    req.cookies?.customer_token ||
-    req.cookies?.admin_token ||
-    req.cookies?.token;
+  const token = getTokenFromRequest(req);
   if (!token)
     return res.status(401).json({ message: "No token found in cookies" });
 

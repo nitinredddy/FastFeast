@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import Navbar from "../components/Navbar";
 import axios from "../api/axios";
 import toast from "react-hot-toast";
+import { normalizeOrders } from "../utils/orders";
 
 const Feedback = () => {
   const [orders, setOrders] = useState([]);
@@ -27,11 +28,13 @@ const Feedback = () => {
     fetchOrders();
   }, []);
 
+  const normalizedOrders = useMemo(() => normalizeOrders(orders), [orders]);
+
   const orderedItems = useMemo(() => {
     const seen = new Map();
 
-    orders.forEach((order) => {
-      order.items?.forEach((item) => {
+    normalizedOrders.forEach((order) => {
+      order.items.forEach((item) => {
         if (!seen.has(item.item_id)) {
           seen.set(item.item_id, item.name);
         }
@@ -39,7 +42,7 @@ const Feedback = () => {
     });
 
     return Array.from(seen.entries()).map(([item_id, name]) => ({ item_id, name }));
-  }, [orders]);
+  }, [normalizedOrders]);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
