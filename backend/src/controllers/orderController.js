@@ -5,6 +5,7 @@ import {
   createOrUpdatePaymentRecord,
   expirePendingPayments,
   getPaymentByOrderId,
+  reconcilePaymentsForOrders,
   refundOrderPayment,
 } from "../lib/paymentLedger.js";
 import { ensurePaymentSchema } from "../lib/paymentSchema.js";
@@ -187,6 +188,21 @@ export const getAllOrders = async (req, res) => {
 
     const date = req.query.date || today;
 
+    const [candidateOrders] = await pool.query(
+      `SELECT o.order_id
+       FROM Orders o
+       JOIN Payments p ON p.order_id = o.order_id
+       WHERE DATE(o.order_date) = ?
+         AND p.provider = 'razorpay'
+         AND p.status IN ('pending', 'failed', 'cancelled')`,
+      [date]
+    );
+
+    await reconcilePaymentsForOrders(
+      pool,
+      candidateOrders.map((order) => order.order_id)
+    );
+
     const [orders] = await pool.query(
       `SELECT
         o.order_id,
@@ -280,6 +296,21 @@ export const getUserOrders = async (req, res) => {
   try {
     await expirePendingPaymentOrders();
     const user_id = req.user.user_id;
+
+    const [candidateOrders] = await pool.query(
+      `SELECT o.order_id
+       FROM Orders o
+       JOIN Payments p ON p.order_id = o.order_id
+       WHERE o.user_id = ?
+         AND p.provider = 'razorpay'
+         AND p.status IN ('pending', 'failed', 'cancelled')`,
+      [user_id]
+    );
+
+    await reconcilePaymentsForOrders(
+      pool,
+      candidateOrders.map((order) => order.order_id)
+    );
 
     const [orders] = await pool.query(
       `SELECT 

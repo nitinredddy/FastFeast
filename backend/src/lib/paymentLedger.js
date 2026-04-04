@@ -170,6 +170,69 @@ export const getPaymentByOrderId = async (executor, orderId) => {
   return rows[0] || null;
 };
 
+export const reconcileRazorpayPayment = async (executor, payment) => {
+  if (!payment || payment.provider !== "razorpay" || !payment.provider_order_id) {
+    return payment;
+  }
+
+  if (["paid", "refunded"].includes(payment.status)) {
+    return payment;
+  }
+
+  try {
+    const razorpay = getRazorpayClient();
+    const paymentCollection = await razorpay.orders.fetchPayments(payment.provider_order_id);
+    const items = Array.isArray(paymentCollection?.items) ? paymentCollection.items : [];
+
+    const successfulPayment = items.find(
+      (item) => item.status === "captured" || item.status === "authorized" || item.captured === true
+    );
+
+    if (successfulPayment) {
+      await markPaymentState(executor, {
+        orderId: payment.order_id,
+        paymentStatus: "paid",
+        providerPaymentId: successfulPayment.id,
+        failureReason: null,
+        verified: true,
+      });
+
+      return getPaymentByOrderId(executor, payment.order_id);
+    }
+
+    return payment;
+  } catch (err) {
+    console.error(`Failed to reconcile Razorpay payment for order ${payment.order_id}:`, err.message);
+    return payment;
+  }
+};
+
+export const reconcilePaymentsForOrders = async (executor, orderIds = []) => {
+  if (!Array.isArray(orderIds) || orderIds.length === 0) {
+    return;
+  }
+
+  const uniqueOrderIds = [...new Set(orderIds.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0))];
+  if (!uniqueOrderIds.length) {
+    return;
+  }
+
+  const placeholders = uniqueOrderIds.map(() => "?").join(", ");
+  const [payments] = await executor.query(
+    `SELECT p.*, o.status AS order_status, o.order_no
+     FROM Payments p
+     JOIN Orders o ON o.order_id = p.order_id
+     WHERE p.order_id IN (${placeholders})
+       AND p.provider = 'razorpay'
+       AND p.status IN ('pending', 'failed', 'cancelled')`,
+    uniqueOrderIds
+  );
+
+  for (const payment of payments) {
+    await reconcileRazorpayPayment(executor, payment);
+  }
+};
+
 export const refundOrderPayment = async ({
   orderId,
   reason = "Order cancelled",
