@@ -80,6 +80,7 @@ const Cart = () => {
       const { razorpay } = createOrderRes.data;
       const key = import.meta.env.VITE_RAZORPAY_KEY_ID || razorpay.key;
       let paymentCompleted = false;
+      let verificationStarted = false;
 
       if (!key) {
         throw new Error("Razorpay key is missing in the frontend environment");
@@ -96,20 +97,19 @@ const Cart = () => {
         theme: { color: "#f97316" },
         modal: {
           ondismiss: async () => {
-            if (paymentCompleted) {
+            if (paymentCompleted || verificationStarted) {
               return;
             }
-            await axios.post("/api/payment/fail", {
-              razorpay_order_id: razorpay.order_id,
-              reason: "User closed the Razorpay checkout",
-            });
-            setPaymentError("Payment was cancelled before completion. You can retry.");
+            setPaymentError(
+              "Checkout was closed before confirmation. The order will stay pending briefly, and you can retry payment."
+            );
             setLoading(false);
           },
         },
         handler: async (response) => {
           try {
             paymentCompleted = true;
+            verificationStarted = true;
             await axios.post("/api/payment/verify", response);
             toast.success("Payment successful and order placed");
             setCart([]);
@@ -134,14 +134,21 @@ const Cart = () => {
       });
 
       razorpayCheckout.on("payment.failed", async (response) => {
+        if (paymentCompleted || verificationStarted) {
+          return;
+        }
         paymentCompleted = false;
-        await axios.post("/api/payment/fail", {
-          razorpay_order_id: razorpay.order_id,
-          reason:
-            response.error?.description ||
-            response.error?.reason ||
-            "Razorpay payment failed",
-        });
+        try {
+          await axios.post("/api/payment/fail", {
+            razorpay_order_id: razorpay.order_id,
+            reason:
+              response.error?.description ||
+              response.error?.reason ||
+              "Razorpay payment failed",
+          });
+        } catch (failureRecordError) {
+          console.error("Failed to record payment failure:", failureRecordError);
+        }
         setPaymentError(response.error?.description || "Payment failed. Please try again.");
         setLoading(false);
       });

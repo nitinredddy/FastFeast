@@ -114,6 +114,20 @@ export const markPaymentState = async (
          payment_verified_at = CASE WHEN ? THEN NOW() ELSE payment_verified_at END,
          status = CASE
            WHEN ? = 'paid' AND status = 'pending' THEN 'preparing'
+           WHEN ? = 'paid'
+             AND status = 'cancelled'
+             AND payment_verified_at IS NULL
+             AND COALESCE(payment_status, 'pending') IN ('pending', 'failed', 'cancelled')
+             AND (
+               payment_failure_reason IS NULL OR
+               payment_failure_reason IN (
+                 'Payment timed out',
+                 'User closed the Razorpay checkout',
+                 'Razorpay payment failed',
+                 'Signature verification failed'
+               )
+             )
+           THEN 'preparing'
            WHEN ? IN ('failed', 'cancelled') AND status = 'pending' THEN 'cancelled'
            ELSE status
          END
@@ -124,6 +138,7 @@ export const markPaymentState = async (
       providerSignature,
       failureReason,
       verified,
+      paymentStatus,
       paymentStatus,
       paymentStatus,
       orderId,

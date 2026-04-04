@@ -4,21 +4,41 @@ import pool from "../config/db.js";
 import dotenv from "dotenv";
 dotenv.config();
 
+const getClientType = (req) => {
+  const client = String(req.headers["x-app-client"] || req.body?.client || "").toLowerCase();
+  return client === "admin" ? "admin" : "customer";
+};
+
+const getCookieName = (req) => (getClientType(req) === "admin" ? "admin_token" : "customer_token");
+
+const getTokenFromRequest = (req) =>
+  req.cookies?.[getCookieName(req)] || req.cookies?.token;
+
 // ✅ helper function to generate token & send cookie
-const sendToken = (user, res, message) => {
+const sendToken = (req, user, res, message) => {
   const token = jwt.sign(
     { user_id: user.user_id, name: user.name, role: user.role },
     process.env.JWT_SECRET,
     { expiresIn: "7d" }
   );
 
+  const cookieName = getCookieName(req);
+
   // Send token as HTTP-only cookie
-  res.cookie("token", token, {
+  res.cookie(cookieName, token, {
     httpOnly: true,       // prevents JS access (XSS protection)
     secure: process.env.NODE_ENV === "production",        // true in production with HTTPS
     sameSite: "lax",
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   });
+
+  if (cookieName !== "token") {
+    res.clearCookie("token", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+    });
+  }
 
   res.json({
     message,
@@ -64,7 +84,7 @@ export const register = async (req, res) => {
     const newUser = rows[0];
 
     // ✅ auto-login after register
-    sendToken(newUser, res, "Registered and logged in successfully");
+    sendToken(req, newUser, res, "Registered and logged in successfully");
   } catch (err) {
     console.error("Registration error:", err);
     if (err.code === "ER_BAD_NULL_ERROR") {
@@ -96,7 +116,7 @@ export const login = async (req, res) => {
     if (!valid) return res.status(400).json({ message: "Invalid email or password" });
 
     // ✅ send token via cookie
-    sendToken(user, res, "Login successful");
+    sendToken(req, user, res, "Login successful");
   } catch (err) {
     console.error("Login error:", err);
     res.status(500).json({ message: "Login failed" });
@@ -110,6 +130,12 @@ export const login = async (req, res) => {
 
 export const logout = (req, res) => {
   try {
+    const cookieName = getCookieName(req);
+    res.clearCookie(cookieName, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+    });
     res.clearCookie("token", {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -127,7 +153,7 @@ export const logout = (req, res) => {
 // ✅ VERIFY LOGIN STATUS (for cookie-based auth)
 export const verifyUser = async (req, res) => {
   try {
-    const token = req.cookies.token; // read from cookie
+    const token = getTokenFromRequest(req);
     if (!token) {
       return res.status(401).json({ valid: false, message: "No token found" });
     }

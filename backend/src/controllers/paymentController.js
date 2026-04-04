@@ -229,11 +229,7 @@ export const verifyPayment = async (req, res) => {
       });
     }
 
-    if (payment.status !== "pending") {
-      return res.status(400).json({ message: "This payment request is no longer active" });
-    }
-
-    if (payment.expires_at && new Date(payment.expires_at) < new Date()) {
+    if (payment.expires_at && new Date(payment.expires_at) < new Date() && payment.status === "pending") {
       await markOrderAsFailed(connection, payment.order_id, "Payment timed out", "cancelled");
       return res.status(400).json({ message: "Payment session expired. Please try again." });
     }
