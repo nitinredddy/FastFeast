@@ -172,6 +172,7 @@ Sample admin accounts from the dump include:
 ### Backend
 
 - `DB_HOST`: MySQL host
+- `DB_PORT`: MySQL port
 - `DB_USER`: MySQL username
 - `DB_PASS`: MySQL password
 - `DB_NAME`: database name
@@ -218,6 +219,7 @@ npm run build:admin
 - Use HTTPS in production.
 - For cross-site frontend/backend deployments, set `AUTH_COOKIE_SAME_SITE=none` and `AUTH_COOKIE_SECURE=true`.
 - If the backend runs behind Nginx, Render, Railway, Fly.io, or another proxy, set `AUTH_TRUST_PROXY=true`.
+- For a Vercel-specific setup guide, including how to move your existing local MySQL menu data to a hosted database, see [docs/VERCEL_DEPLOY.md](/Users/nitinreddy/Desktop/fastfeast/docs/VERCEL_DEPLOY.md).
 - If you need cookies shared across subdomains, set `AUTH_COOKIE_DOMAIN` to your parent domain.
 
 ## Notes
