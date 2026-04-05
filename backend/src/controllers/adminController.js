@@ -9,11 +9,18 @@ export const getDashboardStats = async (req, res) => {
     await ensurePaymentSchema();
     // 🧾 Total orders
     const [[{ total_orders }]] = await pool.query(
-      "SELECT COUNT(*) AS total_orders FROM Orders"
+      `SELECT COUNT(*) AS total_orders
+       FROM Orders o
+       LEFT JOIN Payments p ON p.order_id = o.order_id
+       WHERE COALESCE(p.status, o.payment_status, 'paid') = 'paid'`
     );
 
     const [[{ today_orders }]] = await pool.query(
-      "SELECT COUNT(*) AS today_orders FROM Orders WHERE DATE(order_date) = CURDATE()"
+      `SELECT COUNT(*) AS today_orders
+       FROM Orders o
+       LEFT JOIN Payments p ON p.order_id = o.order_id
+       WHERE DATE(o.order_date) = CURDATE()
+         AND COALESCE(p.status, o.payment_status, 'paid') = 'paid'`
     );
 
     // 🍔 Active menu items (available = TRUE)

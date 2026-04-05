@@ -154,6 +154,11 @@ export const getOrderById = async (req, res) => {
       return res.status(404).json({ message: "Order not found" });
     }
 
+    const resolvedPaymentStatus = order[0].payment_status || "paid";
+    if (req.user.role !== "customer" && resolvedPaymentStatus !== "paid") {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
     if (req.user.role === "customer" && order[0].user_id !== req.user.user_id) {
       return res.status(403).json({ message: "You can only access your own orders" });
     }
@@ -220,6 +225,7 @@ export const getAllOrders = async (req, res) => {
       JOIN User u ON o.user_id = u.user_id
       LEFT JOIN Payments p ON p.order_id = o.order_id
       WHERE DATE(o.order_date) = ?
+        AND COALESCE(p.status, o.payment_status, 'paid') = 'paid'
       ORDER BY o.order_no ASC`,
       [date]
     );
