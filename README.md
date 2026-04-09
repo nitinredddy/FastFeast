@@ -89,11 +89,12 @@ JWT_EXPIRES_IN=7d
 NODE_ENV=development
 CORS_ORIGIN_CUSTOMER=http://localhost:5173
 CORS_ORIGIN_ADMIN=http://localhost:5174
+CORS_ORIGINS=
 AUTH_COOKIE_MAX_AGE_MS=604800000
-AUTH_COOKIE_SAME_SITE=lax
-AUTH_COOKIE_SECURE=false
+AUTH_COOKIE_SAME_SITE=
+AUTH_COOKIE_SECURE=
 AUTH_COOKIE_DOMAIN=
-AUTH_TRUST_PROXY=false
+AUTH_TRUST_PROXY=
 RAZORPAY_KEY_ID=rzp_test_xxxxxxxxxx
 RAZORPAY_KEY_SECRET=xxxxxxxxxx
 RAZORPAY_WEBHOOK_SECRET=whsec_xxxxxxxxxx
@@ -182,11 +183,12 @@ Sample admin accounts from the dump include:
 - `NODE_ENV`: runtime mode
 - `CORS_ORIGIN_CUSTOMER`: allowed origin for the customer app
 - `CORS_ORIGIN_ADMIN`: allowed origin for the admin app
+- `CORS_ORIGINS`: optional comma-separated extra frontend origins for deployments and preview URLs
 - `AUTH_COOKIE_MAX_AGE_MS`: auth cookie lifetime in milliseconds
-- `AUTH_COOKIE_SAME_SITE`: cookie same-site policy, usually `lax` locally and `none` for cross-site HTTPS deployments
-- `AUTH_COOKIE_SECURE`: whether auth cookies require HTTPS
+- `AUTH_COOKIE_SAME_SITE`: optional cookie same-site override; defaults to `lax` locally and `none` in production
+- `AUTH_COOKIE_SECURE`: optional cookie secure override; defaults to `false` locally and `true` in production
 - `AUTH_COOKIE_DOMAIN`: optional shared cookie domain for production
-- `AUTH_TRUST_PROXY`: enable when running the backend behind a reverse proxy or load balancer
+- `AUTH_TRUST_PROXY`: optional reverse-proxy override; defaults to `true` in production
 - `RAZORPAY_KEY_ID`: Razorpay public key used by the backend SDK
 - `RAZORPAY_KEY_SECRET`: Razorpay secret key used only on the backend
 - `PAYMENT_TIMEOUT_MINUTES`: how long an unpaid order stays active
@@ -217,8 +219,8 @@ npm run build:admin
 - Set backend CORS origins to the exact deployed frontend URLs.
 - Use a strong `JWT_SECRET` in production.
 - Use HTTPS in production.
-- For cross-site frontend/backend deployments, set `AUTH_COOKIE_SAME_SITE=none` and `AUTH_COOKIE_SECURE=true`.
-- If the backend runs behind Nginx, Render, Railway, Fly.io, or another proxy, set `AUTH_TRUST_PROXY=true`.
+- Production now defaults to deployment-safe auth cookies: `SameSite=None`, `Secure=true`, and `trust proxy=true`.
+- If you have multiple frontend domains or preview URLs, add them to `CORS_ORIGINS` as a comma-separated list.
 - For a Vercel-specific setup guide, including how to move your existing local MySQL menu data to a hosted database, see [docs/VERCEL_DEPLOY.md](/Users/nitinreddy/Desktop/fastfeast/docs/VERCEL_DEPLOY.md).
 - If you need cookies shared across subdomains, set `AUTH_COOKIE_DOMAIN` to your parent domain.
 

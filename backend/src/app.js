@@ -2,7 +2,7 @@ import express from "express";
 import dotenv from "dotenv";
 import cookieParser from "cookie-parser";
 import cors from "cors";
-import { ALLOWED_CORS_ORIGINS, AUTH_TRUST_PROXY } from "./config/auth.js";
+import { ALLOWED_CORS_ORIGINS, AUTH_TRUST_PROXY, normalizeOrigin } from "./config/auth.js";
 
 import authRoutes from "./routes/authRoutes.js";
 import menuRoutes from "./routes/menuRoutes.js";
@@ -28,11 +28,13 @@ app.use(cookieParser());
 app.use(
   cors({
     origin(origin, callback) {
-      if (!origin || ALLOWED_CORS_ORIGINS.includes(origin)) {
+      const normalizedOrigin = normalizeOrigin(origin);
+
+      if (!origin || (normalizedOrigin && ALLOWED_CORS_ORIGINS.includes(normalizedOrigin))) {
         return callback(null, true);
       }
 
-      return callback(new Error(`CORS blocked for origin: ${origin}`));
+      return callback(new Error(`CORS blocked for origin: ${normalizedOrigin || origin}`));
     },
     credentials: true,
   })
