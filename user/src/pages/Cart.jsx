@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import CartItem from "../components/CartItem";
 import axios from "../api/axios";
@@ -9,6 +9,7 @@ import { loadRazorpayScript } from "../utils/razorpay";
 
 const Cart = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [cart, setCart] = useState(getCart());
   const [pickupTime, setPickupTime] = useState("");
   const [loading, setLoading] = useState(false);
@@ -18,6 +19,17 @@ const Cart = () => {
   useEffect(() => {
     saveCart(cart);
   }, [cart]);
+
+  useEffect(() => {
+    if (location.state?.loginJustSucceeded) {
+      toast.success(
+        location.state?.resumeCheckout
+          ? "Logged in. You can continue with checkout now."
+          : "Logged in successfully."
+      );
+      navigate(location.pathname, { replace: true });
+    }
+  }, [location.pathname, location.state, navigate]);
 
   const subtotal = useMemo(
     () => cart.reduce((sum, item) => sum + Number(item.cost) * item.quantity, 0),
@@ -53,9 +65,32 @@ const Cart = () => {
     setCart((current) => current.filter((item) => item.item_id !== id));
   };
 
+  const ensureAuthenticatedForCheckout = async () => {
+    try {
+      const res = await axios.get("/auth/verify");
+      return res.data?.valid && res.data?.user?.role === "customer";
+    } catch {
+      return false;
+    }
+  };
+
   const handleOrder = async () => {
     if (cart.length === 0) {
       toast.error("Your cart is empty.");
+      return;
+    }
+
+    const isAuthenticated = await ensureAuthenticatedForCheckout();
+    if (!isAuthenticated) {
+      toast("Please log in to continue checkout.", {
+        icon: "🔐",
+      });
+      navigate("/login", {
+        state: {
+          redirectTo: "/cart",
+          resumeCheckout: true,
+        },
+      });
       return;
     }
 

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { LogOut, Menu, MessageSquareText, ShoppingCart, X } from "lucide-react";
+import { LogIn, LogOut, Menu, MessageSquareText, ShoppingCart, X } from "lucide-react";
 import axios from "../api/axios";
 import toast from "react-hot-toast";
 import { clearCart, getCartCount, subscribeToCart } from "../utils/cart";
@@ -10,6 +10,7 @@ const Navbar = ({ cartCount }) => {
   const location = useLocation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [derivedCartCount, setDerivedCartCount] = useState(getCartCount());
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   const visibleCartCount = cartCount ?? derivedCartCount;
 
@@ -19,16 +20,56 @@ const Navbar = ({ cartCount }) => {
 
   useEffect(() => subscribeToCart(setDerivedCartCount), []);
 
+  useEffect(() => {
+    let ignore = false;
+
+    axios
+      .get("/auth/verify")
+      .then((res) => {
+        if (!ignore) {
+          setIsAuthenticated(res.data?.valid && res.data?.user?.role === "customer");
+        }
+      })
+      .catch(() => {
+        if (!ignore) {
+          setIsAuthenticated(false);
+        }
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [location.pathname]);
+
   const handleLogout = async () => {
     try {
       await axios.post("/auth/logout");
       clearCart();
+      setIsAuthenticated(false);
       toast.success("Logged out successfully");
       navigate("/login");
     } catch (err) {
       console.error("Logout error:", err);
       toast.error("Failed to logout");
     }
+  };
+
+  const navigateToLogin = (redirectTo = location.pathname, resumeCheckout = false) => {
+    navigate("/login", {
+      state: {
+        redirectTo,
+        resumeCheckout,
+      },
+    });
+  };
+
+  const handleProtectedNavigation = (path) => {
+    if (!isAuthenticated && (path === "/orders" || path === "/feedback")) {
+      navigateToLogin(path);
+      return;
+    }
+
+    navigate(path);
   };
 
   const navItems = [
@@ -53,7 +94,7 @@ const Navbar = ({ cartCount }) => {
             return (
               <button
                 key={item.path}
-                onClick={() => navigate(item.path)}
+                onClick={() => handleProtectedNavigation(item.path)}
                 className={`rounded-full px-4 py-2 text-sm font-medium transition ${
                   active
                     ? "bg-orange-500 text-white shadow-sm"
@@ -78,13 +119,23 @@ const Navbar = ({ cartCount }) => {
             )}
           </button>
 
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
-          >
-            <LogOut size={16} />
-            Logout
-          </button>
+          {isAuthenticated ? (
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
+            >
+              <LogOut size={16} />
+              Logout
+            </button>
+          ) : (
+            <button
+              onClick={() => navigateToLogin()}
+              className="flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
+            >
+              <LogIn size={16} />
+              Login
+            </button>
+          )}
         </div>
 
         <button
@@ -102,7 +153,7 @@ const Navbar = ({ cartCount }) => {
             {navItems.map((item) => (
               <button
                 key={item.path}
-                onClick={() => navigate(item.path)}
+                onClick={() => handleProtectedNavigation(item.path)}
                 className={`rounded-2xl px-4 py-3 text-left text-sm font-medium transition ${
                   location.pathname === item.path
                     ? "bg-orange-500 text-white"
@@ -134,13 +185,23 @@ const Navbar = ({ cartCount }) => {
               Share feedback
             </button>
 
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white"
-            >
-              <LogOut size={16} />
-              Logout
-            </button>
+            {isAuthenticated ? (
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white"
+              >
+                <LogOut size={16} />
+                Logout
+              </button>
+            ) : (
+              <button
+                onClick={() => navigateToLogin()}
+                className="flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white"
+              >
+                <LogIn size={16} />
+                Login
+              </button>
+            )}
           </div>
         </div>
       )}

@@ -83,7 +83,14 @@ let bootstrapPromise;
 
 export const bootstrapApp = () => {
   if (!bootstrapPromise) {
-    bootstrapPromise = ensureOrderPaymentSchema().then(() => ensurePaymentSchema());
+    bootstrapPromise = ensureOrderPaymentSchema()
+      .then(() => ensurePaymentSchema())
+      .catch((err) => {
+        console.warn(
+          "Skipping payment schema bootstrap; auth and core API can still start:",
+          err?.code || err?.message || err
+        );
+      });
   }
 
   return bootstrapPromise;

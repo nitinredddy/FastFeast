@@ -1,10 +1,11 @@
 import React, { useState } from "react";
 import axios from "../api/axios";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import toast from "react-hot-toast";
 
 const Login = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [formData, setFormData] = useState({ email: "", password: "" });
   const [loading, setLoading] = useState(false);
 
@@ -19,7 +20,14 @@ const Login = () => {
       await axios.post("/auth/login", formData);
 
       toast.success("Login successful");
-      navigate("/home");
+      const redirectTo = location.state?.redirectTo || "/home";
+      navigate(redirectTo, {
+        replace: true,
+        state: {
+          loginJustSucceeded: true,
+          resumeCheckout: Boolean(location.state?.resumeCheckout),
+        },
+      });
     } catch (err) {
       toast.error(err.response?.data?.message || "Login failed");
     } finally {
@@ -33,6 +41,11 @@ const Login = () => {
         <h2 className="text-2xl font-bold text-center text-orange-600 mb-6">
           Welcome to FastFeast
         </h2>
+        {location.state?.resumeCheckout && (
+          <p className="mb-4 rounded-lg bg-orange-50 px-3 py-2 text-sm text-orange-700">
+            Please log in to continue with checkout.
+          </p>
+        )}
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
           <input
             type="email"
