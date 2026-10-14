@@ -46,7 +46,17 @@ const validateBusinessState = async () => {
   const endHour = Number(settings.open_hour_end);
 
   const now = new Date();
-  const currentHour = now.getHours() + now.getMinutes() / 60;
+  const istTime = new Intl.DateTimeFormat("en-IN", {
+   timeZone: "Asia/Kolkata",
+   hour: "2-digit",
+   minute: "2-digit",
+   hour12: false,
+  }).formatToParts(now);
+
+  const hour = Number(istTime.find((part) => part.type === "hour").value);
+  const minute = Number(istTime.find((part) => part.type === "minute").value);
+
+  const currentHour = hour + minute / 60;
   const isOpen =
     startHour < endHour
       ? currentHour >= startHour && currentHour < endHour

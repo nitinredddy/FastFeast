@@ -88,11 +88,19 @@ export const createOrUpdatePaymentRecord = async (executor, payment) => {
 
 export const markPaymentState = async (
   executor,
-  { orderId, paymentStatus, failureReason = null, providerPaymentId = null, providerSignature = null, verified = false }
+  {
+    orderId,
+    paymentStatus,
+    failureReason = null,
+    providerPaymentId = null,
+    providerSignature = null,
+    verified = false,
+  }
 ) => {
   await ensurePaymentSchema();
 
-  const normalizedOrderPaymentStatus = paymentStatus === "refunded" ? "paid" : paymentStatus;
+  const normalizedOrderPaymentStatus =
+    paymentStatus === "refunded" ? "paid" : paymentStatus;
 
   await executor.query(
     `UPDATE Payments
@@ -102,17 +110,19 @@ export const markPaymentState = async (
          failure_reason = ?,
          verified_at = CASE WHEN ? THEN NOW() ELSE verified_at END
      WHERE order_id = ?`,
-    [paymentStatus, providerPaymentId, providerSignature, failureReason, verified, orderId]
+    [
+      paymentStatus,
+      providerPaymentId,
+      providerSignature,
+      failureReason,
+      verified,
+      orderId,
+    ]
   );
 
   await executor.query(
     `UPDATE Orders
-     SET payment_status = ?,
-         razorpay_payment_id = COALESCE(?, razorpay_payment_id),
-         razorpay_signature = COALESCE(?, razorpay_signature),
-         payment_failure_reason = ?,
-         payment_verified_at = CASE WHEN ? THEN NOW() ELSE payment_verified_at END,
-         status = CASE
+     SET status = CASE
            WHEN ? = 'paid' AND status = 'pending' THEN 'preparing'
            WHEN ? = 'paid'
              AND status = 'cancelled'
@@ -130,22 +140,26 @@ export const markPaymentState = async (
            THEN 'preparing'
            WHEN ? IN ('failed', 'cancelled') AND status = 'pending' THEN 'cancelled'
            ELSE status
-         END
+         END,
+         payment_status = ?,
+         razorpay_payment_id = COALESCE(?, razorpay_payment_id),
+         razorpay_signature = COALESCE(?, razorpay_signature),
+         payment_failure_reason = ?,
+         payment_verified_at = CASE WHEN ? THEN NOW() ELSE payment_verified_at END
      WHERE order_id = ?`,
     [
+      paymentStatus,
+      paymentStatus,
+      paymentStatus,
       normalizedOrderPaymentStatus,
       providerPaymentId,
       providerSignature,
       failureReason,
       verified,
-      paymentStatus,
-      paymentStatus,
-      paymentStatus,
       orderId,
     ]
   );
 };
-
 export const getPaymentByProviderOrderId = async (executor, providerOrderId) => {
   const [rows] = await executor.query(
     `SELECT p.*, o.status AS order_status, o.order_no
